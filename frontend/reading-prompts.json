@@ -1,0 +1,210 @@
+{
+  "version": 1,
+  "purpose": "Optional reading suggestions; no transcript verification or guaranteed recording quality.",
+  "languages": {
+    "pt_br": [
+      {
+        "id": "pt-01",
+        "title": "Uma manhã na cidade",
+        "text": "Na primeira manhã de primavera, abri a janela e ouvi o movimento da praça. Um ciclista passou devagar, a padaria começou a receber clientes e o cheiro de café fresco chegou até a cozinha."
+      },
+      {
+        "id": "pt-02",
+        "title": "Caminho pela natureza",
+        "text": "Seguimos por uma trilha estreita, entre árvores altas e pequenas flores amarelas. Perto do riacho, uma borboleta pousou numa folha. Ficamos em silêncio por alguns instantes, ouvindo a água correr entre as pedras."
+      },
+      {
+        "id": "pt-03",
+        "title": "Compras na feira",
+        "text": "Na feira de sábado, escolhi laranjas maduras, cenouras, queijo fresco e um maço de cheiro-verde. A vendedora explicou como conservar os legumes. Antes de voltar, parei numa barraca para tomar um suco gelado."
+      },
+      {
+        "id": "pt-04",
+        "title": "Preparando uma viagem",
+        "text": "Você já conferiu os horários da viagem? Nossa saída está marcada para quinta-feira, depois do almoço. Vou separar os documentos, carregar o telefone e colocar uma blusa na mochila, porque a previsão indica uma noite fria."
+      },
+      {
+        "id": "pt-05",
+        "title": "Cozinha e receita",
+        "text": "Enquanto a panela aquecia, piquei a cebola e amassei dois dentes de alho. Acrescentei os ingredientes aos poucos e mexi com uma colher de madeira. No final, provei o molho e ajustei uma pitada de sal."
+      },
+      {
+        "id": "pt-06",
+        "title": "Uma conversa tranquila",
+        "text": "Que bom encontrar você por aqui! Eu estava justamente pensando naquela conversa da semana passada. Podemos sentar perto da janela? Quero ouvir como foi seu projeto e contar uma novidade que chegou hoje de manhã."
+      },
+      {
+        "id": "pt-07",
+        "title": "Tecnologia no cotidiano",
+        "text": "O aplicativo recebeu uma atualização que tornou a pesquisa mais rápida. Agora podemos organizar arquivos, revisar mensagens e compartilhar informações com poucos toques. Mesmo assim, prefiro conferir cada detalhe antes de enviar um documento importante."
+      },
+      {
+        "id": "pt-08",
+        "title": "Livros e descobertas",
+        "text": "Encontrei um livro de capa azul numa pequena livraria do bairro. A história acompanha uma pesquisadora que atravessa o oceano em busca de respostas. Li o primeiro capítulo sem perceber que já estava quase na hora de fechar."
+      },
+      {
+        "id": "pt-09",
+        "title": "Chuva no fim da tarde",
+        "text": "O céu escureceu de repente, e a chuva começou a bater no telhado. Recolhemos as cadeiras da varanda e fechamos as janelas. Depois de alguns minutos, o vento diminuiu e apareceu uma faixa de luz entre as nuvens."
+      },
+      {
+        "id": "pt-10",
+        "title": "Organizando o trabalho",
+        "text": "Precisamos combinar as próximas etapas com clareza. Primeiro, vamos reunir os dados e verificar o que ainda falta. Depois, cada pessoa poderá apresentar suas sugestões. Assim teremos tempo para corrigir os problemas antes da entrega."
+      },
+      {
+        "id": "pt-11",
+        "title": "Música e lembranças",
+        "text": "Uma música antiga começou a tocar no rádio e me trouxe a lembrança de uma festa em família. Havia risadas na sala, crianças correndo pelo corredor e alguém tentando acompanhar o refrão sem conhecer direito a letra."
+      },
+      {
+        "id": "pt-12",
+        "title": "No jardim",
+        "text": "Plantei manjericão, alecrim e algumas sementes de girassol em vasos diferentes. Todas as manhãs, verifico a terra antes de regar. Quando surgem as primeiras folhas, lembro que o crescimento exige cuidado, paciência e um pouco de luz."
+      },
+      {
+        "id": "pt-13",
+        "title": "Uma dúvida no caminho",
+        "text": "Com licença, você sabe onde fica a estação mais próxima? Disseram que eu deveria atravessar a avenida e seguir pela rua das Palmeiras. Se houver um caminho mais tranquilo, posso andar um pouco mais sem problema."
+      },
+      {
+        "id": "pt-14",
+        "title": "O céu à noite",
+        "text": "Ao cair da noite, levamos uma manta para o quintal e procuramos as estrelas mais brilhantes. A Lua estava fina e o horizonte parecia imenso. Conversamos sobre planetas, viagens espaciais e perguntas que ainda não sabemos responder."
+      },
+      {
+        "id": "pt-15",
+        "title": "Uma pequena conquista",
+        "text": "Depois de várias tentativas, consegui terminar a peça que estava construindo. Ela não ficou exatamente como no desenho, mas funcionou muito bem. Chamei um amigo para ver o resultado e explicar o que eu havia aprendido."
+      },
+      {
+        "id": "pt-16",
+        "title": "Passeio perto do mar",
+        "text": "Caminhamos pela praia antes de o sol ficar forte. As ondas deixavam pequenas conchas na areia, e alguns barcos seguiam devagar ao longe. Na volta, encontramos uma sombra agradável e dividimos uma garrafa de água."
+      },
+      {
+        "id": "pt-17",
+        "title": "Escolhas e possibilidades",
+        "text": "Talvez seja melhor começar com uma solução simples e observar o resultado. Se precisarmos, faremos mudanças ao longo do caminho. O importante é entender a situação, fazer boas perguntas e manter espaço para aprender com a experiência."
+      },
+      {
+        "id": "pt-18",
+        "title": "Esporte no parque",
+        "text": "No domingo, o parque recebeu um grupo de corredores e várias famílias. Algumas pessoas treinavam na pista, enquanto outras passeavam com seus cachorros. Nós preferimos caminhar, conversar e aproveitar o ar fresco da manhã."
+      },
+      {
+        "id": "pt-19",
+        "title": "Números no cotidiano",
+        "text": "Reservei três caixas pequenas e duas maiores para organizar a mudança. Os livros ficaram na primeira, as roupas na segunda e os objetos frágeis receberam proteção extra. Ao todo, fizemos quatro viagens antes de terminar o serviço."
+      },
+      {
+        "id": "pt-20",
+        "title": "Uma mensagem de boas-vindas",
+        "text": "Olá, seja bem-vindo! Preparei este espaço para que nossa conversa seja simples e agradável. Pode falar com tranquilidade, fazer perguntas e explicar o que precisa. Vamos observar os detalhes e encontrar juntos o melhor caminho para continuar."
+      }
+    ],
+    "en_us": [
+      {
+        "id": "en-01",
+        "title": "A morning in town",
+        "text": "On the first warm morning of spring, I opened the window and listened to the street below. A cyclist passed the bakery, neighbors exchanged greetings, and the smell of fresh coffee drifted into the kitchen."
+      },
+      {
+        "id": "en-02",
+        "title": "A walk through the woods",
+        "text": "We followed a narrow path between tall trees and bright yellow flowers. Near the stream, a butterfly settled on a leaf. For a moment, we stopped talking and listened to the water moving over the smooth stones."
+      },
+      {
+        "id": "en-03",
+        "title": "At the market",
+        "text": "At the Saturday market, I bought ripe oranges, fresh cheese, carrots, and a bunch of herbs. The seller explained how to keep the vegetables fresh. Before leaving, I stopped for a cool drink beneath a striped umbrella."
+      },
+      {
+        "id": "en-04",
+        "title": "Planning a journey",
+        "text": "Have you checked the schedule for our trip? We are leaving on Thursday, shortly after lunch. I will pack the documents, charge my phone, and bring a warm jacket, because the evening may be colder than we expect."
+      },
+      {
+        "id": "en-05",
+        "title": "Making dinner",
+        "text": "While the pan was warming, I chopped an onion and crushed two cloves of garlic. I added the ingredients slowly and stirred with a wooden spoon. At the end, I tasted the sauce and added a little salt."
+      },
+      {
+        "id": "en-06",
+        "title": "Catching up with a friend",
+        "text": "What a pleasant surprise to see you here! I was just thinking about our conversation last week. Shall we sit by the window? I would love to hear about your project and share a little news of my own."
+      },
+      {
+        "id": "en-07",
+        "title": "Everyday technology",
+        "text": "The latest update made the search feature much faster. We can now organize files, review messages, and share information with just a few taps. Even so, I always check the details before sending an important document."
+      },
+      {
+        "id": "en-08",
+        "title": "A book worth reading",
+        "text": "I found a blue book in a quiet neighborhood shop. The story follows a researcher who crosses the ocean in search of answers. I became so interested in the first chapter that I nearly missed the closing announcement."
+      },
+      {
+        "id": "en-09",
+        "title": "An afternoon shower",
+        "text": "The sky grew dark, and rain began tapping on the roof. We brought the chairs in from the porch and closed the windows. A few minutes later, the wind weakened and a pale ribbon of sunlight appeared between the clouds."
+      },
+      {
+        "id": "en-10",
+        "title": "Working together",
+        "text": "We should agree on the next steps before starting. First, we will gather the information and check what is missing. Then everyone can offer suggestions, so we have enough time to solve any problems before the final delivery."
+      },
+      {
+        "id": "en-11",
+        "title": "Music and memory",
+        "text": "An old song came on the radio and reminded me of a family celebration. There was laughter in the living room, children racing down the hallway, and someone trying to sing the chorus without quite remembering the words."
+      },
+      {
+        "id": "en-12",
+        "title": "Growing a small garden",
+        "text": "I planted basil, rosemary, and a few sunflower seeds in separate pots. Each morning, I check the soil before watering them. Watching the first leaves appear reminds me that growth takes care, patience, and a little light."
+      },
+      {
+        "id": "en-13",
+        "title": "Asking for directions",
+        "text": "Excuse me, do you know where the nearest station is? Someone told me to cross the avenue and follow the road beside the library. If there is a quieter route, I would not mind walking a little farther."
+      },
+      {
+        "id": "en-14",
+        "title": "Looking at the stars",
+        "text": "After sunset, we carried a blanket into the yard and looked for the brightest stars. The moon was thin, and the horizon seemed enormous. We talked about distant planets, space travel, and questions that still have no clear answer."
+      },
+      {
+        "id": "en-15",
+        "title": "A small achievement",
+        "text": "After several attempts, I finally finished the piece I had been building. It did not look exactly like the drawing, but it worked beautifully. I invited a friend over to see the result and hear what I had learned."
+      },
+      {
+        "id": "en-16",
+        "title": "A walk beside the sea",
+        "text": "We walked along the beach before the sun grew strong. The waves left tiny shells on the sand, while a few boats moved slowly in the distance. On our way back, we found some shade and shared a bottle of water."
+      },
+      {
+        "id": "en-17",
+        "title": "Considering the options",
+        "text": "Perhaps we should begin with a simple solution and see how it works. We can make changes as we go. What matters is understanding the situation, asking thoughtful questions, and leaving enough room to learn from the experience."
+      },
+      {
+        "id": "en-18",
+        "title": "A day in the park",
+        "text": "On Sunday, the park filled with runners, families, and people walking their dogs. Some visitors practiced on the track, while others relaxed under the trees. We chose to take a gentle walk and enjoy the fresh morning air."
+      },
+      {
+        "id": "en-19",
+        "title": "Packing for a move",
+        "text": "I set aside three small boxes and two larger ones for the move. The books went into the first box, the clothes into the second, and the fragile objects received extra padding. We made four trips before everything was finished."
+      },
+      {
+        "id": "en-20",
+        "title": "A warm welcome",
+        "text": "Hello, and welcome! I have prepared this space to make our conversation comfortable and straightforward. Take your time, ask questions, and tell me what you need. Together, we can look at the details and decide how to move forward."
+      }
+    ]
+  }
+}

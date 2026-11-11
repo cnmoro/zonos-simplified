@@ -1,6 +1,7 @@
 import {PCMReader, wavBlob} from './audio.mjs';
 import {initializeReferences, addReferenceFiles, clearReferenceFiles, getReferenceFiles, referenceFileCount, setReferenceListDisabled, selectionPayload, analyzedReferenceCount, referencesBusy} from './references.js';
 import {initializeMicrophone, setMicrophoneAvailable} from './recordings.js';
+import {initializeReadingPrompts, setReadingLanguage, setReadingLocked} from './reading-prompts.js';
 const $ = id => document.getElementById(id);
 const session = globalThis.crypto?.randomUUID?.() ?? Array.from(globalThis.crypto.getRandomValues(new Uint8Array(16)), byte => byte.toString(16).padStart(2, '0')).join('');
 let cachedFile = null, cachedVoice = null, controller, context, objectURL;
@@ -11,7 +12,8 @@ function chooseDefaultVoice() {
   const voice = speakers.find(speaker => speaker.original_name?.startsWith(name) && speaker.source_type === 'audio');
   if (voice) $('voice').value = voice.id;
 }
-$('language').onchange = chooseDefaultVoice;
+$('language').onchange = () => { chooseDefaultVoice(); setReadingLanguage($('language').value); };
+initializeReadingPrompts($('language').value);
 const headers = {'Content-Type': 'application/json', 'X-TTS-Session-ID': session};
 async function checked(response) {
   if (!response.ok) throw new Error(`API ${response.status}: ${(await response.text()).slice(0, 300)}`);
@@ -50,6 +52,8 @@ function updateReferenceControls() {
   const files = getReferenceFiles();
   const occupied = working || referencesBusy() || microphoneActive;
   $('reference').disabled = occupied;
+  $('language').disabled = occupied;
+  setReadingLocked(occupied);
   setReferenceListDisabled(occupied);
   for (const input of document.querySelectorAll('#reference-rows input')) input.disabled = occupied;
   setMicrophoneAvailable(!occupied && files.length < 20);

@@ -42,13 +42,28 @@ def main():
                 page.goto(args.url,wait_until='networkidle')
                 page.wait_for_function("document.getElementById('health').textContent === 'Modelo conectado'")
                 assert page.evaluate('isSecureContext && !!navigator.mediaDevices?.getUserMedia')
+                page.wait_for_function("document.getElementById('reading-prompt').options.length === 20")
+                page.select_option('#reading-prompt','6')
+                initial_reading=page.locator('#reading-text').inner_text()
                 for i in range(2):
                     page.click('#record-start')
                     page.wait_for_function("!document.getElementById('record-stop').disabled")
+                    assert page.locator('#reading-next').is_disabled()
+                    assert page.locator('#reading-prompt').is_disabled()
+                    assert page.locator('#language').is_disabled()
+                    reading=page.locator('#reading-text').inner_text()
                     page.wait_for_timeout(2300)
+                    assert page.locator('#reading-text').inner_text()==reading
                     page.click('#record-stop')
                     page.wait_for_function("document.getElementById('record-stop').disabled && !document.getElementById('record-start').disabled")
                     assert page.locator('#reference-file-rows audio').count()==i+1
+                    if i==0:
+                        page.click('#reading-next')
+                        assert page.locator('#reading-text').inner_text()!=initial_reading
+                page.select_option('#language','en_us')
+                assert page.locator('#reading-prompt option').count()==20
+                assert page.locator('#reading-text').get_attribute('lang')=='en-US'
+                page.select_option('#language','pt_br')
                 # Uploads and recordings share the same review list.
                 page.set_input_files('#reference',{'name':'uploaded.wav','mimeType':'audio/wav','buffer':clip_bytes(args.reference)})
                 assert page.locator('#reference-file-rows audio').count()==3
@@ -78,7 +93,7 @@ def main():
                 page.screenshot(path=str(output/'microphone-mobile.png'),full_page=True)
                 assert not errors,errors
                 report.update(status='passed',microphone_samples=2,uploaded_samples=1,selected_samples=2,
-                              generated=True,page_errors=errors)
+                              generated=True,reading_prompts_per_language=20,reading_locked_during_capture=True,page_errors=errors)
                 browser.close()
     finally:
         if voice_id:

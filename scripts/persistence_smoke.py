@@ -33,7 +33,7 @@ def main():
         with urllib.request.urlopen(request,timeout=180) as response: return json.load(response)
     with tempfile.TemporaryDirectory(prefix='zonos-persistence-') as directory:
         env=dict(os.environ,ZONOS3_VOICES_DIR=str(Path(directory)/'voices'))
-        for name in ['ZONOS3_TLS_CERT','ZONOS3_TLS_KEY','ZONOS3_TLS_PORT','ZONOS3_ACCESS_TOKEN']: env.pop(name,None)
+        for name in ['ZONOS3_TLS_CERT','ZONOS3_TLS_KEY','ZONOS3_TLS_PORT','ZONOS3_HTTP_DISABLED','ZONOS3_ACCESS_TOKEN']: env.pop(name,None)
         command=[str(ROOT/'build/cuda/zonos3-server'),str(model/'zonos3-ptq.gguf'),'--gpu','--zac-gpu',
                  '--zac',str(model/'zac-keep2.gguf'),'--spk-encoder',str(model/'spk-encoder.gguf'),
                  '--batch','1','--zac-threads','1','--max','200','--host','127.0.0.1','--port',str(port),

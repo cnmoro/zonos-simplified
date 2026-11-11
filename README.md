@@ -40,7 +40,7 @@ A compilação inicial pode demorar vários minutos. O padrão de quatro jobs li
 bash scripts/serve.sh
 ```
 
-O bind padrão é **`0.0.0.0:1919`**. Abra:
+Sem certificados, o bind é **`0.0.0.0:1919`**. Com certificados instalados, o padrão é **somente HTTPS em `0.0.0.0:1920`**, sem listener HTTP. Os endereços abaixo de HTTP se aplicam à instalação sem TLS ou ao modo dual explicitamente habilitado. Abra:
 
 - No próprio host: `http://127.0.0.1:1919`.
 - Na LAN ou Tailscale: `http://IP_DO_HOST:1919`.
@@ -74,6 +74,7 @@ Variáveis de ambiente:
 | `ZONOS3_PORT` | `1919` | Porta HTTP. |
 | `ZONOS3_VOICES_DIR` | `<projeto>/voices` | Diretório persistente das vozes do usuário. |
 | `ZONOS3_MAX_TOKENS` | `1000` | Teto de posições de áudio por geração. |
+| `ZONOS3_HTTP_DISABLED` | `1` quando há certificados | Desliga completamente o listener HTTP; `0` habilita ambos. |
 | `ZONOS3_TLS_PORT` | `1920` | Porta HTTPS, habilitada quando há certificado/chave locais. |
 | `ZONOS3_TLS_CERT` / `ZONOS3_TLS_KEY` | `<projeto>/certs/server.pem` / `server-key.pem` | Certificado/chave do listener nativo TLS; autodetectados quando existem. |
 | `ZONOS3_ACCESS_TOKEN` | ausente | Exige bearer token/cookie em todas as rotas, quando configurado. |
@@ -102,6 +103,14 @@ WAV, MP3, OGG, FLAC, M4A, AAC, Opus, WebM e outros formatos decodificáveis pelo
 
 Uma referência única ainda pode ser usada diretamente para clonagem temporária, sem criar perfil. Com várias referências na UI, revise e salve o perfil antes de gerar.
 
+### Textos de apoio para a gravação
+
+A interface oferece **20 parágrafos originais em português e 20 em inglês**. O idioma acompanha o seletor principal. Escolha um tema em **Parágrafo de referência** ou avance com **Anterior / Próximo texto**. O texto fica fixo e os controles são bloqueados durante a captura.
+
+Os parágrafos variam contextos, palavras, perguntas, frases afirmativas, números por extenso e construções para incentivar uma leitura natural. Use diferentes textos nas amostras. Isso amplia a variedade da leitura, mas não é certificação de cobertura fonética nem garantia de qualidade: ambiente silencioso, pouca reverberação, distância estável e voz natural continuam importantes. Não acelere para caber em um tempo fixo.
+
+Os textos são opcionais; o usuário pode falar livremente ou ler outro material. Não há transcrição automática nem verificação de que o áudio corresponde ao texto sugerido. O catálogo está disponível em `/reading-prompts.json` para clientes e agentes.
+
 ### HTTPS autoassinado para usar o microfone remotamente
 
 O navegador exige **localhost ou HTTPS confiável**, além de permissão de microfone. Para o acesso remoto, crie uma CA local autoassinada e o certificado do servidor:
@@ -112,11 +121,11 @@ python scripts/create_tls_cert.py
 bash scripts/serve.sh
 ```
 
-O mesmo processo passa a atender **HTTP em 1919 e HTTPS em 1920**, compartilhando modelo, scheduler e biblioteca. O bind continua `0.0.0.0`; não usa proxy, Tailscale Serve ou Funnel.
+Com certificados instalados, o processo atende **somente HTTPS em 1920** por padrão; a porta HTTP 1919 fica fechada. `ZONOS3_HTTP_DISABLED=0` permite habilitar ambos explicitamente, compartilhando modelo, scheduler e biblioteca. O bind continua `0.0.0.0`; não usa proxy, Tailscale Serve ou Funnel.
 
 No dispositivo cliente:
 
-1. Baixe `http://IP_DO_HOST:1919/ca.crt` pelo link exibido na interface.
+1. Obtenha a CA pública em `frontend/ca.crt` no host ou baixe `https://IP_DO_HOST:1920/ca.crt` aceitando a exceção do certificado apenas para esse download inicial.
 2. Importe o certificado público nas **autoridades confiáveis** do sistema/navegador. No Chrome/Edge, use as configurações de gerenciamento de certificados; no Firefox, a seção de autoridades em certificados.
 3. Abra `https://IP_DO_HOST:1920` e permita o microfone quando solicitado. Apenas ignorar o aviso de certificado pode não liberar a captura.
 

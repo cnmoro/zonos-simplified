@@ -3,6 +3,7 @@ import json
 import os
 from pathlib import Path
 import ssl
+import socket
 import unittest
 import urllib.error
 import urllib.request
@@ -19,6 +20,13 @@ class NativeHTTPS(unittest.TestCase):
         cls.http=os.environ.get('ZONOS_LIVE_URL','http://127.0.0.1:1919').rstrip('/')
         cls.ca=Path(os.environ.get('ZONOS_CA_FILE',str(ROOT/'certs/ca.pem')))
         cls.context=ssl.create_default_context(cafile=str(cls.ca))
+
+    @unittest.skipUnless(os.environ.get('ZONOS_EXPECT_HTTP_DISABLED') == '1', 'Set ZONOS_EXPECT_HTTP_DISABLED=1 to assert HTTP is closed')
+    def test_plain_http_port_is_closed(self):
+        host = urlparse(self.https).hostname
+        with socket.socket() as connection:
+            connection.settimeout(2)
+            self.assertNotEqual(connection.connect_ex((host,1919)),0)
 
     def test_verified_tls_health_and_same_library(self):
         with urllib.request.urlopen(self.https+'/v2/health',context=self.context) as response:

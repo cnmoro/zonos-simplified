@@ -29,7 +29,7 @@ def patch():
                 raise RuntimeError(f'Runtime changed: expected one patch anchor: {old}')
             text = text.replace(old, new)
         path.write_text(text)
-    for name in ('saved-voices.inc', 'reference-analysis.inc', 'reference-math.h', 'tls-listener.inc'):
+    for name in ('saved-voices.inc', 'reference-analysis.inc', 'reference-math.h', 'tls-listener.inc', 'server-listen.inc'):
         shutil.copyfile(ROOT / 'native' / name, SOURCE / name)
     text = path.read_text()
     if '#include "reference-math.h"' not in text:
@@ -61,6 +61,12 @@ def patch():
     target = 'auto register_local_routes = [&](httplib::Server & endpoint) {'
     if 'endpoint.set_read_timeout(120);' not in text:
         text = text.replace(target, target + '\n    endpoint.set_read_timeout(120);\n    endpoint.set_write_timeout(600);')
+        path.write_text(text)
+    text = path.read_text()
+    if '#include "server-listen.inc"' not in text:
+        start = text.index('    bool bound = !s.worker_failed;')
+        end = text.index('    if (tls_server) tls_server->stop();', start)
+        text = text[:start] + '#include "server-listen.inc"\n\n' + text[end:]
         path.write_text(text)
     cmake = SOURCE.parents[1] / 'CMakeLists.txt'
     text = cmake.read_text()

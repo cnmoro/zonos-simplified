@@ -117,6 +117,8 @@ As análises expiram **30 minutos depois de terminar o processamento**, com no m
 
 Na UI, o usuário também pode gravar várias referências pelo microfone, ouvir/remover amostras e misturar gravações com uploads. O navegador produz WebM/Opus, OGG/Opus ou M4A conforme suporte; a API os recebe como qualquer outro arquivo. A gravação só é enviada ao servidor quando o usuário manda analisar, ou quando gera diretamente com uma única referência temporária.
 
+A UI inclui **20 parágrafos em português e 20 em inglês** para leitura opcional. `GET /reading-prompts.json` retorna `{"version":1,"languages":{"pt_br":[{"id":"pt-01","title":"...","text":"..."}],"en_us":[...]}}`. Os IDs identificam sugestões de leitura, não amostras de áudio. Use o idioma do usuário, permita escolher o texto e recomende leitura natural em local silencioso. A UI impede mudar o texto durante a captura. Não trate a sugestão como transcrição comprovada nem atribua uma nota de qualidade por o usuário ter lido esses parágrafos; não há ASR/alinhamento neste fluxo.
+
 Microfone exige contexto seguro e permissão do usuário. Use localhost ou o listener HTTPS, com o certificado local confiado no dispositivo. Um agente HTTP não pode acessar o microfone do usuário sem um cliente/browser autorizado. Não há endpoint que grave secretamente o microfone do servidor.
 
 ### 3.1 Upload multipart, recomendado
@@ -415,14 +417,13 @@ Vozes salvas ficam no diretório `voices/` do host (ou `ZONOS3_VOICES_DIR`). Ess
 
 ## 12. HTTPS local e confiança no certificado
 
-O listener HTTP padrão usa porta 1919. Quando o operador gera o certificado local, existe também **HTTPS na porta 1920** por padrão, com os mesmos endpoints, biblioteca e processo/modelo em GPU. Não há proxy, Serve ou Funnel. `/tls.json`, quando existe, informa `https_port` e o caminho do certificado público.
+O listener HTTP padrão usa porta 1919. Quando o operador gera o certificado local, o launcher usa **somente HTTPS na porta 1920** por padrão, com HTTP desligado (dual opcional: `ZONOS3_HTTP_DISABLED=0`), com os mesmos endpoints, biblioteca e processo/modelo em GPU. Não há proxy, Serve ou Funnel. `/tls.json`, quando existe, informa `https_port` e o caminho do certificado público.
 
-A CA local é autoassinada. O certificado público pode ser obtido em `/ca.crt`; o cliente precisa confiar nessa CA, ou informar seu arquivo explicitamente. Confira sua origem com o operador antes de importar. Nunca peça a chave privada da CA ou do servidor. Para curl:
+A CA local é autoassinada. O certificado público pode ser obtido em `/ca.crt` na origem HTTPS, ou copiado do host em `frontend/ca.crt`; o cliente precisa confiar nessa CA, ou informar seu arquivo explicitamente. Confira sua origem com o operador antes de importar. Nunca peça a chave privada da CA ou do servidor. Para curl:
 
 ```bash
-# Obtenha o certificado público pela origem HTTP conhecida do host.
-BASE_HTTP='http://HOST:1919' # substitua pelo host real
-curl --fail "$BASE_HTTP/ca.crt" -o zonos-local-ca.crt
+# Obtenha a CA pública do operador (frontend/ca.crt no host), por um canal confiável.
+# HTTP fica desligado por padrão quando há certificados.
 BASE_HTTPS='https://HOST:1920' # substitua pelo host real
 curl --cacert zonos-local-ca.crt --fail "$BASE_HTTPS/v2/health"
 ```
