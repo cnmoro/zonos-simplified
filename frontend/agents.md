@@ -437,3 +437,95 @@ curl --cacert zonos-local-ca.crt --fail "$BASE_HTTPS/v2/health"
 Em Python, use `ssl.create_default_context(cafile="zonos-local-ca.crt")` e passe `context=` ao `urllib.request.urlopen`. Para o CLI, `SSL_CERT_FILE=/caminho/zonos-local-ca.crt python infer.py --url https://HOST:1920 ...` usa a CA sem desativar verificação. Evite `verify=False`/`--insecure` nos fluxos normais; eles só ignoram a verificação e não instalam confiança no navegador para liberar microfone.
 
 No navegador, importe o certificado público em autoridades confiáveis do dispositivo/navegador e abra a origem HTTPS. Depois permita acesso ao microfone. O certificado cobre os IPs/DNS informados na sua criação; usar outro IP/nome pode produzir erro de hostname. Consulte o README do projeto para gerar/renovar o certificado.
+
+## 13. Baixar o mesmo áudio em velocidades diferentes e consultar durações
+
+Esse fluxo **não chama o modelo de voz novamente**. Ele usa o filtro `atempo` do FFmpeg em CPU, preservando o tom, e disponibiliza WAV PCM16 mono a 44100 Hz. O intervalo é **0.5x a 2.0x, em passos de 0.1x**. Não envie `speed` para `/v2/generate` nem `/v1/audio/speech`: esses endpoints de síntese continuam com seu contrato original.
+
+### 13.1 Registrar o áudio já gerado
+
+Depois de receber o WAV da geração, registre seus bytes:
+
+```bash
+curl --cacert zonos-local-ca.crt --fail-with-body "$BASE/v2/audio-assets" \
+  -F 'audio=@speech.wav' -o audio-asset.json
+```
+
+O exemplo assume `BASE` como origem HTTPS e uma CA pública já obtida do operador. Se a CA já estiver confiada no sistema, `--cacert` pode ser omitido.
+
+Alternativa JSON: `{"audio_name":"speech.wav","audio_base64":"BASE64_REAL_DOS_BYTES"}`. Limites: um arquivo de até **20 MiB**, **120 segundos** e corpo de até 28 MiB. Outros formatos decodificáveis pelo FFmpeg também podem ser registrados e são normalizados; um WAV PCM16 mono/44100 válido é preservado byte a byte em 1.0x.
+
+HTTP 201 retorna:
+
+```json
+{
+  "id":"audio_0123456789abcdef01234567",
+  "name":"speech.wav",
+  "duration_seconds":3.2,
+  "expires_at":1790003600.0,
+  "persistent":false,
+  "format":"wav",
+  "sample_rate":44100,
+  "channels":1,
+  "speed_min":0.5,
+  "speed_max":2.0,
+  "speed_step":0.1,
+  "durations_url":"/v2/audio-assets/audio_0123456789abcdef01234567/durations",
+  "download_url":"/v2/audio-assets/audio_0123456789abcdef01234567/download?speed=1.0"
+}
+```
+
+IDs e números são ilustrativos. Não confunda `audio_...` com `voice_...`: um identifica uma saída de áudio temporária, o outro um perfil persistente do locutor. Não é necessário usar sessão para esses assets.
+
+### 13.2 Consultar a duração de cada velocidade
+
+`GET /v2/audio-assets/{id}/durations` prepara e retorna **todas as 16 velocidades**. Para consultar apenas algumas, use `?speeds=1.0,1.3,1.5`. Isso reduz trabalho e armazenamento quando você só precisa de um subconjunto.
+
+```bash
+AUDIO_ID='audio_ID_REAL'
+curl --cacert zonos-local-ca.crt --fail-with-body \
+  "$BASE/v2/audio-assets/$AUDIO_ID/durations?speeds=1.0,1.3"
+```
+
+Resposta HTTP 200:
+
+```json
+{
+  "id":"audio_ID_REAL",
+  "original_duration_seconds":3.2,
+  "expires_at":1790003600.0,
+  "duration_is_measured":true,
+  "preserves_pitch":true,
+  "variants":[
+    {"speed":1.0,"duration_seconds":3.2,"download_url":"/v2/audio-assets/audio_ID_REAL/download?speed=1.0"},
+    {"speed":1.3,"duration_seconds":2.47,"download_url":"/v2/audio-assets/audio_ID_REAL/download?speed=1.3"}
+  ]
+}
+```
+
+As durações são **medidas no WAV convertido, pelo número de amostras**, e não apenas estimadas por `original/speed`. Pequenas diferenças em relação a essa divisão são normais no time-stretch. Os valores acima são exemplos; use a resposta real. A primeira consulta de uma velocidade produz e guarda a variante; consultas seguintes reaproveitam o arquivo. A duração retornada corresponde ao arquivo disponível para download.
+
+### 13.3 Baixar a variante
+
+`GET /v2/audio-assets/{id}/download?speed=1.3` retorna WAV, com `Content-Disposition: attachment`. `speed` é opcional e vale 1.0 por padrão.
+
+```bash
+curl --cacert zonos-local-ca.crt --fail --max-time 180 \
+  "$BASE/v2/audio-assets/$AUDIO_ID/download?speed=1.3" -o speech-1.3x.wav.part \
+  && mv speech-1.3x.wav.part speech-1.3x.wav
+```
+
+Headers `X-Audio-Duration-Seconds` e `X-Audio-Speed` também informam a duração medida e a velocidade. `Content-Type` é `audio/wav`. Não interprete esse endpoint como PCM bruto. Não há opção MP3/Opus de saída nesse fluxo. Velocidade inválida, fora do intervalo, fora do passo de 0.1 ou parâmetros repetidos/desconhecidos retornam 422.
+
+### 13.4 Consultar e descartar o áudio temporário
+
+- `GET /v2/audio-assets/{id}`: metadados do original e URLs, sem criar todas as variantes.
+- `DELETE /v2/audio-assets/{id}`: descarta o original e variantes; responde `{"deleted":"audio_..."}`. Um download já iniciado pode terminar normalmente.
+- 404/410: ID inexistente ou expirado. Registre novamente o WAV original que você guardou no cliente.
+- 429: máximo de 32 assets ativos atingido; descarte assets antigos ou espere expirar.
+- 507: cache de arquivos cheia; descarte assets antigos ou consulte menos velocidades.
+- 400/413: áudio inválido, vazio ou acima dos limites.
+
+Os assets expiram **uma hora após o registro**, são locais ao processo atual e não constituem histórico permanente de gerações. Reiniciar a API invalida os IDs. O cache usa disco, com teto de 512 MiB por instância, mantém apenas metadados em RAM e produz uma conversão por vez, com uma thread de codec/filtro. Entradas expiradas são limpas em novos registros; cache de processos encerrados é removida na próxima inicialização. Arquivos ficam fora do Git e da raiz pública do frontend.
+
+Na UI, após gerar, o slider escolhe a velocidade **do arquivo para download**. Ao lado do botão aparece a duração medida correspondente. O player acima continua reproduzindo o áudio original. Enquanto converte, o download da velocidade escolhida fica desabilitado; 1.0x continua disponível localmente mesmo se a preparação das outras velocidades falhar. O link **Consultar durações na API** consulta o áudio atual. A UI descarta o asset anterior ao gerar outro áudio ou fechar/recarregar a página; agentes que registram assets diretamente controlam seu descarte pelo DELETE. Os perfis de voz persistentes são independentes desse cache e não são apagados.

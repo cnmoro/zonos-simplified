@@ -29,11 +29,15 @@ def patch():
                 raise RuntimeError(f'Runtime changed: expected one patch anchor: {old}')
             text = text.replace(old, new)
         path.write_text(text)
-    for name in ('saved-voices.inc', 'reference-analysis.inc', 'reference-math.h', 'tls-listener.inc', 'server-listen.inc'):
+    for name in ('saved-voices.inc', 'reference-analysis.inc', 'reference-math.h', 'tls-listener.inc', 'server-listen.inc', 'audio-downloads.inc'):
         shutil.copyfile(ROOT / 'native' / name, SOURCE / name)
     text = path.read_text()
     if '#include "reference-math.h"' not in text:
         text = text.replace('#include <regex>', '#include <regex>\n#include "reference-math.h"')
+        path.write_text(text)
+    text = path.read_text()
+    if '#include <fstream>' not in text:
+        text = text.replace('#include <regex>', '#include <regex>\n#include <fstream>\n#include <array>\n#include <csignal>\n#include \"server/workers.h\"')
         path.write_text(text)
     path = SOURCE / 'main.cpp'
     text = path.read_text()
@@ -83,6 +87,8 @@ def patch():
         if anchor not in text:
             raise RuntimeError('Runtime changed: middleware patch anchor is missing')
         text = text.replace(anchor, anchor + '\n    svr.set_payload_max_length(96 * 1024 * 1024);')
+    if 'X-Audio-Duration-Seconds' not in text:
+        text = text.replace('X-Seed, X-Decoder\";', 'X-Seed, X-Decoder, X-Audio-Duration-Seconds, X-Audio-Speed\";')
     old = 'res.set_content(body, httplib::detail::find_content_type(target.string(), {}, "application/octet-stream"));'
     if old in text:
         text = text.replace(old, 'res.set_content(body, rel_path == "agents.md" ? "text/markdown; charset=utf-8" : httplib::detail::find_content_type(target.string(), {}, "application/octet-stream"));')

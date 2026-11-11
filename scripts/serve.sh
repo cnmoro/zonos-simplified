@@ -7,6 +7,7 @@ nvidia-smi >/dev/null || { echo 'NVIDIA GPU unavailable. Check driver/device acc
 for file in "$BIN" "$MODEL/zonos3-ptq.gguf" "$MODEL/zac-keep2.gguf" "$MODEL/spk-encoder.gguf"; do
   [[ -f "$file" ]] || { echo "Missing: $file. Run python scripts/setup.py" >&2; exit 1; }
 done
+export ZONOS3_AUDIO_CACHE_DIR="${ZONOS3_AUDIO_CACHE_DIR:-$ROOT/outputs/audio-cache}"
 export ZONOS3_VOICES_DIR="${ZONOS3_VOICES_DIR:-$ROOT/voices}"
 # With certificates installed, serve HTTPS only by default.
 if [[ -f "$ROOT/certs/server.pem" && -f "$ROOT/certs/server-key.pem" ]]; then

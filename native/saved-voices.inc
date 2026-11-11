@@ -123,6 +123,7 @@ static void saved_unique_name(const SavedVoiceStore & store, const std::string &
 }
 
 #include "reference-analysis.inc"
+#include "audio-downloads.inc"
 
 static void saved_create(ServerState & s, const httplib::Request & request, httplib::Response & response) {
     constexpr size_t max_audio = 20 * 1024 * 1024;
@@ -216,6 +217,7 @@ static void register_saved_voice_routes(httplib::Server & server, ServerState & 
     // Fail startup if the configured persistent directory cannot be initialized.
     saved_voice_store();
     register_reference_analysis_routes(server, s);
+    register_download_routes(server);
     server.Get("/v2/voices", guarded([](const httplib::Request &, httplib::Response & response) {
         send_json(response, json{{"voices", list_saved_voices()}});
     }));

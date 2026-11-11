@@ -1,4 +1,5 @@
 import {PCMReader, wavBlob} from './audio.mjs';
+import {initializeDownloads, clearDownloadAudio, setDownloadAudio} from './downloads.js';
 import {initializeReferences, addReferenceFiles, clearReferenceFiles, getReferenceFiles, referenceFileCount, setReferenceListDisabled, selectionPayload, analyzedReferenceCount, referencesBusy, hasReferenceAnalysis} from './references.js';
 import {initializeMicrophone, setMicrophoneAvailable} from './recordings.js';
 import {initializeReadingPrompts, setReadingLanguage, setReadingLocked} from './reading-prompts.js';
@@ -150,6 +151,7 @@ $('form').onsubmit = async event => {
   const signal = controller.signal;
   $('generate').disabled = true; $('cancel').hidden = false; $('result').hidden = true;
   for (const id of ['language', 'voice', 'text', 'reference', 'voice-name', 'save-voice', 'analyze-references']) $(id).disabled = true;
+  clearDownloadAudio();
   $('audio').pause(); $('audio').removeAttribute('src');
   if (objectURL) { URL.revokeObjectURL(objectURL); objectURL = null; }
   $('status').textContent = 'Preparando…';
@@ -193,8 +195,10 @@ $('form').onsubmit = async event => {
       $('status').textContent = 'Reproduzindo enquanto gera…';
     }
     if (readerPCM.pending.length || !samples) throw new Error('Áudio incompleto ou vazio.');
-    objectURL = URL.createObjectURL(wavBlob(chunks)); $('audio').src = objectURL; $('download').href = objectURL;
+    const blob = wavBlob(chunks);
+    objectURL = URL.createObjectURL(blob); $('audio').src = objectURL;
     const elapsed = (performance.now() - start) / 1000, duration = samples / 44100;
+    setDownloadAudio(blob,objectURL,duration);
     $('metrics').textContent = `${duration.toFixed(1)} s de áudio · Primeiro áudio: ${Math.round(first)} ms · RTF: ${(elapsed / duration).toFixed(2)}`;
     $('result').hidden = false; $('status').textContent = 'Concluído';
     // Let queued playback finish, then release audio resources.
@@ -211,4 +215,5 @@ $('form').onsubmit = async event => {
     updateReferenceControls();
   }
 };
+initializeDownloads();
 connect();

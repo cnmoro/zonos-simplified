@@ -72,6 +72,7 @@ Variáveis de ambiente:
 | --- | --- | --- |
 | `ZONOS3_HOST` | `0.0.0.0` | Endereço de bind; use `127.0.0.1` para acesso só local. |
 | `ZONOS3_PORT` | `1919` | Porta HTTP. |
+| `ZONOS3_AUDIO_CACHE_DIR` | `<projeto>/outputs/audio-cache` | Cache temporário de WAVs e variantes de velocidade, sem afetar perfis de voz. |
 | `ZONOS3_VOICES_DIR` | `<projeto>/voices` | Diretório persistente das vozes do usuário. |
 | `ZONOS3_MAX_TOKENS` | `1000` | Teto de posições de áudio por geração. |
 | `ZONOS3_HTTP_DISABLED` | `1` quando há certificados | Desliga completamente o listener HTTP; `0` habilita ambos. |
@@ -167,6 +168,9 @@ Principais rotas:
 | `GET /v2/speakers/{id}/embedding` | Calcular/consultar o embedding de uma voz. |
 | `POST /v2/generate` | Geração nativa, WAV ou PCM progressivo. |
 | `POST /v1/audio/speech` | Geração compatível com OpenAI. |
+| `POST /v2/audio-assets` | Registrar um áudio já gerado para downloads em outras velocidades. |
+| `GET /v2/audio-assets/{id}/durations` | Durações medidas de todas as velocidades, ou do subconjunto `?speeds=...`. |
+| `GET /v2/audio-assets/{id}/download` | Download WAV com `?speed=1.3`, por exemplo. |
 | `GET /agents.md` | Guia completo para uso autônomo. |
 
 Análise de várias referências:
@@ -208,6 +212,28 @@ curl --fail-with-body --max-time 180 "$BASE/v2/generate" \
 Para inglês, use `language:"en_us"` e texto em inglês. **Sempre envie `speaker_mode:"embedding"` nesta configuração.** O modo de referência bruta requer encoders adicionais que não são instalados aqui.
 
 `stream:true, format:"pcm"` retorna **float32 little-endian, mono, 44100 Hz**, sem cabeçalho; não é PCM16. WAV exige `stream:false`. O frontend reproduz chunks durante a geração e disponibiliza um WAV ao terminar.
+
+## Download em velocidades diferentes
+
+Depois de gerar, use o slider **Velocidade do arquivo para download**, de **0,5x a 2,0x**, em passos de 0,1x. O botão mostra a velocidade selecionada e, ao lado, a duração em segundos medida no WAV convertido. O player acima mantém o áudio original.
+
+A conversão usa `atempo` do FFmpeg para alterar o tempo preservando o tom. Não há nova inferência do modelo nem consumo extra de VRAM. A primeira conversão de cada velocidade é feita em CPU e fica em cache; 1,0x pode ser baixado imediatamente. As durações podem diferir um pouco de `duração original / velocidade`, por isso são medidas no resultado.
+
+Fluxo HTTP para agentes/clientes:
+
+```bash
+# BASE é a origem real da API; configure a confiança na CA local para HTTPS.
+curl --cacert certs/ca.pem --fail-with-body "$BASE/v2/audio-assets" -F 'audio=@outputs/voz.wav'
+# Use o id audio_... retornado:
+curl --cacert certs/ca.pem --fail-with-body "$BASE/v2/audio-assets/audio_ID_REAL/durations?speeds=1.0,1.3,1.5"
+curl --cacert certs/ca.pem --fail "$BASE/v2/audio-assets/audio_ID_REAL/download?speed=1.3" -o outputs/voz-1.3x.wav
+```
+
+Sem `?speeds=`, `/durations` retorna todas as 16 velocidades. A resposta inclui a duração exata de cada WAV e sua URL de download. `GET /v2/audio-assets/{id}` consulta o original; `DELETE /v2/audio-assets/{id}` descarta o asset. O endpoint de download também informa `X-Audio-Duration-Seconds` e `X-Audio-Speed` nos headers.
+
+Até 20 MiB e 120 segundos por áudio; uploads JSON/base64 são aceitos além de multipart. O cache é temporário: uma hora, até 32 assets e 512 MiB por instância, em `outputs/audio-cache/` por padrão (`ZONOS3_AUDIO_CACHE_DIR` altera o diretório). IDs são invalidados após reiniciar a API. A UI limpa o cache do áudio anterior ao gerar outro ou fechar/recarregar a página; salve os downloads que quiser manter. Arquivos e variantes não são versionados. Isso não altera a biblioteca persistente de vozes.
+
+Consulte o [guia completo](frontend/agents.md#13-baixar-o-mesmo-áudio-em-velocidades-diferentes-e-consultar-durações) para payloads, respostas, limites e erros. [Documentação do filtro atempo](https://ffmpeg.org/ffmpeg-filters.html#atempo).
 
 ## Cliente Python
 
@@ -275,6 +301,7 @@ Testes reais de interface no Chromium:
 .venv/bin/python scripts/named_voice_smoke.py --reference outputs/validation/reference.mp3
 .venv/bin/python scripts/named_generation_smoke.py --url https://HOST:1920
 .venv/bin/python scripts/multi_reference_smoke.py
+.venv/bin/python scripts/download_speed_smoke.py --url https://HOST:1920
 # Instância temporária isolada: precisa de VRAM extra durante o teste, sem mexer na biblioteca real.
 .venv/bin/python scripts/persistence_smoke.py
 # Requer um Chromium local com suporte a dispositivo de áudio de teste:
