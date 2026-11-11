@@ -39,6 +39,7 @@ function renderFileList() {
     row.append(name, remove, audio); $('reference-file-rows').append(row);
   });
 }
+export function hasReferenceAnalysis() { return analysis !== null; }
 export function analyzedReferenceCount() { return analysis && validSelection ? selected.size : 0; }
 export function referencesBusy() { return busy; }
 export function selectionPayload() {

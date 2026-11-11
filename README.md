@@ -101,6 +101,10 @@ Limites: **1 a 20 referências** por conjunto, **20 MiB por arquivo**, **64 MiB 
 
 WAV, MP3, OGG, FLAC, M4A, AAC, Opus, WebM e outros formatos decodificáveis pelo FFmpeg são aceitos. Nomes de perfis têm limite de 120 bytes UTF-8 e precisam ser únicos; não são usados como caminhos de arquivo.
 
+Com **uma referência e um nome**, o botão muda para **Salvar voz e gerar**: primeiro a API confirma que o perfil está salvo em disco, depois a geração começa com esse ID persistente. A voz e o idioma selecionados são restaurados após F5; a biblioteca é sempre consultada no servidor, mesmo sem armazenamento local no navegador. Se o cadastro falhar, a UI mantém a referência e não gera usando uma voz temporária como fallback.
+
+Sem preencher um nome, uma referência única pode ser usada por **Gerar sem salvar**, explicitamente temporária. Preencher um nome sem fornecer referência não permite gerar uma nova voz com esse nome.
+
 Uma referência única ainda pode ser usada diretamente para clonagem temporária, sem criar perfil. Com várias referências na UI, revise e salve o perfil antes de gerar.
 
 ### Textos de apoio para a gravação
@@ -269,6 +273,7 @@ Testes reais de interface no Chromium:
 .venv/bin/python -m playwright install chromium
 .venv/bin/python scripts/browser_smoke.py --reference outputs/validation/reference.mp3
 .venv/bin/python scripts/named_voice_smoke.py --reference outputs/validation/reference.mp3
+.venv/bin/python scripts/named_generation_smoke.py --url https://HOST:1920
 .venv/bin/python scripts/multi_reference_smoke.py
 # Instância temporária isolada: precisa de VRAM extra durante o teste, sem mexer na biblioteca real.
 .venv/bin/python scripts/persistence_smoke.py

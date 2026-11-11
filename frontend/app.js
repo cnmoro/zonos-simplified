@@ -1,9 +1,22 @@
 import {PCMReader, wavBlob} from './audio.mjs';
-import {initializeReferences, addReferenceFiles, clearReferenceFiles, getReferenceFiles, referenceFileCount, setReferenceListDisabled, selectionPayload, analyzedReferenceCount, referencesBusy} from './references.js';
+import {initializeReferences, addReferenceFiles, clearReferenceFiles, getReferenceFiles, referenceFileCount, setReferenceListDisabled, selectionPayload, analyzedReferenceCount, referencesBusy, hasReferenceAnalysis} from './references.js';
 import {initializeMicrophone, setMicrophoneAvailable} from './recordings.js';
 import {initializeReadingPrompts, setReadingLanguage, setReadingLocked} from './reading-prompts.js';
 const $ = id => document.getElementById(id);
-const session = globalThis.crypto?.randomUUID?.() ?? Array.from(globalThis.crypto.getRandomValues(new Uint8Array(16)), byte => byte.toString(16).padStart(2, '0')).join('');
+function newSession() {
+  return globalThis.crypto?.randomUUID?.() ?? Array.from(globalThis.crypto.getRandomValues(new Uint8Array(16)), byte => byte.toString(16).padStart(2, '0')).join('');
+}
+let session;
+try { session = sessionStorage.getItem('zonos.session') || newSession(); sessionStorage.setItem('zonos.session',session); }
+catch { session = newSession(); }
+function preference(key) { try { return localStorage.getItem(key); } catch { return null; } }
+function remember(key,value) { try { value ? localStorage.setItem(key,value) : localStorage.removeItem(key); } catch {} }
+function rememberSelection() {
+  const selected = speakers.find(speaker => speaker.id === $('voice').value);
+  remember('zonos.voiceId',selected && (selected.persistent || selected.is_default) ? selected.id : null);
+  remember('zonos.language',$('language').value);
+  updateReferenceControls();
+}
 let cachedFile = null, cachedVoice = null, controller, context, objectURL;
 let speakers = [], working = false, microphoneActive = false;
 function chooseDefaultVoice() {
@@ -12,7 +25,9 @@ function chooseDefaultVoice() {
   const voice = speakers.find(speaker => speaker.original_name?.startsWith(name) && speaker.source_type === 'audio');
   if (voice) $('voice').value = voice.id;
 }
-$('language').onchange = () => { chooseDefaultVoice(); setReadingLanguage($('language').value); };
+if (['pt_br','en_us'].includes(preference('zonos.language'))) $('language').value = preference('zonos.language');
+$('language').onchange = () => { chooseDefaultVoice(); setReadingLanguage($('language').value); rememberSelection(); };
+$('voice').onchange = rememberSelection;
 initializeReadingPrompts($('language').value);
 const headers = {'Content-Type': 'application/json', 'X-TTS-Session-ID': session};
 async function checked(response) {
@@ -20,20 +35,24 @@ async function checked(response) {
   return response;
 }
 async function loadSpeakers(selected) {
-  const data = await (await checked(await fetch('/v2/speakers', {headers}))).json();
+  const data = await (await checked(await fetch('/v2/speakers', {headers,cache:'no-store'}))).json();
   speakers = data.speakers;
   $('voice').replaceChildren(new Option('Padrão do modelo', ''));
   const saved = document.createElement('optgroup'); saved.label = 'Minhas vozes prontas';
   const defaults = document.createElement('optgroup'); defaults.label = 'Vozes oficiais';
+  const temporary = document.createElement('optgroup'); temporary.label = 'Referências temporárias desta aba';
   for (const speaker of speakers) {
     if (speaker.speaker_modes.includes('embedding')) {
-      (speaker.persistent ? saved : defaults).append(new Option(speaker.label, speaker.id));
+      (speaker.persistent ? saved : speaker.is_default ? defaults : temporary).append(new Option(speaker.label, speaker.id));
     }
   }
   if (saved.children.length) $('voice').append(saved);
   $('voice').append(defaults);
-  if (selected && speakers.some(speaker => speaker.id === selected)) $('voice').value = selected;
+  if (temporary.children.length) $('voice').append(temporary);
+  const preferred = selected || preference('zonos.voiceId');
+  if (preferred && speakers.some(speaker => speaker.id === preferred)) $('voice').value = preferred;
   else chooseDefaultVoice();
+  updateReferenceControls();
 }
 async function connect() {
   try {
@@ -60,7 +79,17 @@ function updateReferenceControls() {
   $('voice').disabled = occupied || !!files.length;
   $('analyze-references').disabled = occupied || !files.length;
   $('save-voice').disabled = occupied || !analyzedReferenceCount();
-  $('generate').disabled = occupied || files.length > 1;
+  $('generate').disabled = occupied || files.length > 1 || (hasReferenceAnalysis() && !analyzedReferenceCount());
+  const named = !!$('voice-name').value.trim();
+  if (named && !files.length) $('generate').disabled = true;
+  $('generate').textContent = files.length > 1 ? 'Salve o perfil para gerar' : files.length && named ? 'Salvar voz e gerar' : files.length ? 'Gerar sem salvar' : 'Gerar voz';
+  const selected = speakers.find(speaker => speaker.id === $('voice').value);
+  $('voice-state').textContent = files.length
+    ? (named ? 'A voz será salva no servidor antes da geração.' : 'Sem nome: a referência é temporária. Para guardar, preencha o nome.')
+    : named ? 'Grave ou envie um áudio para criar a voz com esse nome.'
+    : selected?.persistent ? 'Perfil salvo no servidor, disponível após recarregar a página.'
+    : selected?.is_default ? 'Voz oficial selecionada.' : '';
+
 }
 initializeReferences(updateReferenceControls);
 initializeMicrophone({
@@ -71,32 +100,35 @@ initializeMicrophone({
   },
   onRecorded: file => { cachedFile = null; cachedVoice = null; addReferenceFiles([file], 'microphone'); }
 });
-$('save-voice').onclick = async () => {
+$('voice-name').oninput = updateReferenceControls;
+async function persistNamedVoice({allowSingle=false,signal}={}) {
   const name = $('voice-name').value.trim();
-  if (!name) { $('status').textContent = 'Dê um nome à voz antes de confirmar.'; return; }
-  let selection;
-  try { selection = selectionPayload(); }
-  catch (error) { $('status').textContent = error.message; return; }
+  if (!name) throw new Error('Dê um nome à voz antes de confirmar.');
+  let source;
+  if (hasReferenceAnalysis()) source = selectionPayload();
+  else if (allowSingle && referenceFileCount() === 1) {
+    const file = getReferenceFiles()[0];
+    source = {speaker_audio_name:file.name,speaker_audio_base64:await fileBase64(file)};
+  } else throw new Error('Analise as referências e confirme a seleção antes de salvar.');
+  $('status').textContent = 'Salvando a voz no servidor…';
+  const body = {name,language:$('language').value,...source};
+  const voice = await (await checked(await fetch('/v2/voices', {method:'POST',headers,signal,body:JSON.stringify(body)}))).json();
+  if (!voice.ready || !voice.persistent) throw new Error('A API não confirmou a persistência da voz. A geração foi interrompida.');
+  remember('zonos.voiceId',voice.id); remember('zonos.language',$('language').value);
+  $('reference').value = ''; $('voice-name').value = '';
+  cachedFile = null; cachedVoice = null; clearReferenceFiles();
+  await loadSpeakers(voice.id);
+  $('reference-info').textContent = `${voice.name} foi salva no servidor e continuará disponível após recarregar a página.`;
+  return voice;
+}
+$('save-voice').onclick = async () => {
   working = true; updateReferenceControls();
-  const controls = ['generate', 'language', 'voice', 'text', 'reference', 'voice-name', 'save-voice', 'analyze-references'];
-  for (const id of controls) $(id).disabled = true;
-  for (const input of document.querySelectorAll('#reference-rows input')) input.disabled = true;
-  $('status').textContent = 'Salvando o perfil com as referências selecionadas…';
+  $('voice-name').disabled = true;
   try {
-    const body = {name, language:$('language').value, ...selection};
-    const voice = await (await checked(await fetch('/v2/voices', {method:'POST', headers, body:JSON.stringify(body)}))).json();
-    $('reference').value = ''; $('voice-name').value = '';
-    cachedFile = null; cachedVoice = null; clearReferenceFiles();
-    await loadSpeakers(voice.id);
-    $('reference-info').textContent = `${voice.name} está pronta com ${voice.sample_count} referência(s) e continuará disponível após reiniciar a API.`;
+    await persistNamedVoice();
     $('status').textContent = 'Voz salva e pronta para usar';
   } catch (error) { $('status').textContent = error.message; }
-  finally {
-    for (const id of controls) $(id).disabled = false;
-    for (const input of document.querySelectorAll('#reference-rows input')) input.disabled = false;
-    working = false;
-    updateReferenceControls();
-  }
+  finally { working = false; $('voice-name').disabled = false; updateReferenceControls(); }
 };
 $('reference').onchange = () => {
   cachedFile = null; cachedVoice = null;
@@ -111,7 +143,8 @@ $('reference').onchange = () => {
 $('cancel').onclick = () => { controller?.abort(); context?.close(); };
 $('form').onsubmit = async event => {
   event.preventDefault();
-  if (working || referencesBusy() || microphoneActive || referenceFileCount() > 1) return;
+  if (working || referencesBusy() || microphoneActive || referenceFileCount() > 1 || (hasReferenceAnalysis() && !analyzedReferenceCount())) return;
+  if ($('voice-name').value.trim() && !referenceFileCount()) { $('status').textContent = 'Grave ou envie a referência antes de salvar uma nova voz.'; return; }
   working = true; updateReferenceControls();
   controller = new AbortController();
   const signal = controller.signal;
@@ -128,7 +161,9 @@ $('form').onsubmit = async event => {
     const file = getReferenceFiles()[0];
     if (file && file.size > 20 * 1024 * 1024) throw new Error('Use uma referência com até 20 MB.');
     let voice = $('voice').value;
-    if (file) {
+    const saveBeforeGenerating = file && $('voice-name').value.trim();
+    if (saveBeforeGenerating) voice = (await persistNamedVoice({allowSingle:true,signal})).id;
+    if (file && !saveBeforeGenerating) {
       if (cachedFile !== file || !cachedVoice) {
         $('status').textContent = 'Processando a voz de referência…';
         const base64 = await fileBase64(file);

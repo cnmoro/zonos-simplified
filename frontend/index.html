@@ -6,6 +6,7 @@
 <h1>Seu texto, em voz.</h1><p class="intro">Gere em inglês ou português. Use uma voz pronta ou envie uma referência.</p>
 <form id="form">
 <div class="row"><label>Idioma<select id="language"><option value="pt_br">Português · Brasil</option><option value="en_us">English · US</option></select></label><label>Voz<select id="voice"><option value="">Padrão do modelo</option></select></label></div>
+<p id="voice-state" class="hint" role="status"></p>
 <label>Texto<textarea id="text" rows="6" maxlength="3000" required>Olá! Esta é uma demonstração de geração de voz em português.</textarea></label>
 <label class="upload">Clonar uma voz <span>Opcional · 1 a 20 áudios · 20 MiB por arquivo · 64 MiB no total</span><input id="reference" type="file" multiple accept="audio/*,.wav,.mp3,.ogg,.flac,.m4a,.aac,.opus,.aiff,.wma"></label>
 <details id="reading-help" open><summary>Textos de apoio para gravar</summary><p class="hint">Escolha textos diferentes para variar palavras e entonação. Fale de maneira natural, sem acelerar ou forçar a voz. Grave em local silencioso, com distância estável do microfone. Você também pode usar um texto próprio.</p><label>Parágrafo de referência<select id="reading-prompt" disabled><option>Carregando textos…</option></select></label><p id="reading-text" class="reading-text" aria-live="polite">Carregando textos de apoio…</p><div class="reading-navigation"><button id="reading-previous" type="button" disabled>Anterior</button><span id="reading-count"></span><button id="reading-next" type="button" disabled>Próximo texto</button></div><p class="hint">O texto fica fixo durante a gravação. A leitura não é conferida automaticamente e não precisa ser idêntica à sugestão.</p></details>
@@ -22,7 +23,7 @@
 <div class="table-scroll" tabindex="0" role="region" aria-label="Matriz de similaridade"><table id="similarity-matrix"></table></div>
 </section>
 <div class="save-row"><label>Nome para guardar esta voz<input id="voice-name" type="text" maxlength="120" placeholder="Ex.: Narradora principal" autocomplete="off"></label><button id="save-voice" type="button" disabled>Confirmar seleção e salvar voz</button></div>
-<p id="reference-info" class="hint">Analise as referências, escolha quais entram no perfil e confirme para salvar. Um único arquivo também pode ser usado diretamente para geração temporária.</p>
+<p id="reference-info" class="hint">Com uma referência e um nome, use Salvar voz e gerar. Com várias referências, analise, escolha os áudios e confirme a seleção. Gerar sem salvar cria apenas uma referência temporária.</p>
 <div class="actions"><button id="generate" type="submit">Gerar voz</button><button id="cancel" type="button" hidden>Parar</button><span id="status" role="status" aria-live="polite"></span></div>
 </form>
 <section id="result" hidden aria-label="Áudio gerado"><h2>Pronto para ouvir</h2><audio id="audio" controls></audio><div class="row"><p id="metrics"></p><a id="download" download="zonos.wav">Baixar WAV</a></div></section>

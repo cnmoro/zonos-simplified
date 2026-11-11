@@ -397,6 +397,12 @@ O campo opcional `condition_values` aceita `loudness` em LUFS, `fmax` em Hz e `s
 
 Erros usam `{"detail":"mensagem"}`; validação nativa também pode devolver `detail` como lista de objetos `{loc,msg,type}`. Não salve um corpo de erro como `.wav`. Prefira gravar a saída em arquivo temporário e renomeá-lo só após concluir com sucesso. Requisições já em execução podem terminar mesmo se o cliente abortar; abortar o cliente não garante cancelamento imediato da GPU.
 
+### Comportamento da UI ao informar um nome
+
+Com uma única referência e um nome preenchido, a interface usa **Salvar voz e gerar**. Ela chama `/v2/voices`, espera `ready:true` e `persistent:true`, e só então chama `/v2/generate` com o ID persistente. Falha no cadastro bloqueia a geração; não há fallback silencioso para a cache temporária. Com várias referências, continua sendo necessário analisar, revisar os checkboxes e confirmar o perfil.
+
+Isso é uma orquestração da interface: `/v2/generate` por si só continua sem cadastrar perfis, e o campo `name` não é aceito nesse endpoint. Agentes devem executar as etapas de cadastro e geração separadamente. Sem nome, a interface apresenta **Gerar sem salvar** e mantém o comportamento de referência temporária. A sessão da aba é preservada em `sessionStorage` para F5, mas isso não transforma a cache temporária em biblioteca persistente. A seleção de perfil salvo e o idioma ficam como preferências locais; os embeddings continuam no servidor, não no armazenamento do navegador.
+
 ## 10. Fluxo autônomo recomendado
 
 1. Determine a origem da API a partir da URL deste documento e verifique `/v2/health`.
