@@ -29,13 +29,58 @@ def patch():
                 raise RuntimeError(f'Runtime changed: expected one patch anchor: {old}')
             text = text.replace(old, new)
         path.write_text(text)
-    shutil.copyfile(ROOT / 'native/saved-voices.inc', SOURCE / 'saved-voices.inc')
+    for name in ('saved-voices.inc', 'reference-analysis.inc', 'reference-math.h', 'tls-listener.inc'):
+        shutil.copyfile(ROOT / 'native' / name, SOURCE / name)
+    text = path.read_text()
+    if '#include "reference-math.h"' not in text:
+        text = text.replace('#include <regex>', '#include <regex>\n#include "reference-math.h"')
+        path.write_text(text)
+    path = SOURCE / 'main.cpp'
+    text = path.read_text()
+    if '// ZONOS_LOCAL_TLS_LISTENER' not in text:
+        start = text.index('    install_middleware(svr);')
+        end = text.index('\n\n    fprintf(stderr, "zonos3-server: backbone=', start)
+        routes = text[start:end].replace('(svr,', '(endpoint,').replace('(svr)', '(endpoint)')
+        routes = '    endpoint.set_read_timeout(120);\n    endpoint.set_write_timeout(600);\n' + routes
+        text = text[:start] + ('    // ZONOS_LOCAL_TLS_LISTENER\n'
+            '    auto register_local_routes = [&](httplib::Server & endpoint) {\n' + routes + '\n    };\n'
+            '    register_local_routes(svr);\n#include "tls-listener.inc"') + text[end:]
+        anchor = '        ok = svr.listen_after_bind();'
+        assert text.count(anchor) == 1
+        text = text.replace(anchor, '        if (tls_server) {\n'
+            '            fprintf(stderr, "zonos3-server: listening on https://%s:%d (shared engine)\\n", host.c_str(), tls_port);\n'
+            '            tls_thread = std::thread([&] {\n'
+            '                if (!tls_server->listen_after_bind()) { fprintf(stderr, "error: HTTPS accept loop failed\\n"); svr.stop(); }\n'
+            '            });\n        }\n' + anchor)
+        anchor = '    if (s.pyhost) s.pyhost->close();'
+        assert text.count(anchor) == 1
+        text = text.replace(anchor, '    if (tls_server) tls_server->stop();\n'
+            '    if (tls_thread.joinable()) tls_thread.join();\n\n' + anchor)
+        path.write_text(text)
+    text = path.read_text()
+    target = 'auto register_local_routes = [&](httplib::Server & endpoint) {'
+    if 'endpoint.set_read_timeout(120);' not in text:
+        text = text.replace(target, target + '\n    endpoint.set_read_timeout(120);\n    endpoint.set_write_timeout(600);')
+        path.write_text(text)
+    cmake = SOURCE.parents[1] / 'CMakeLists.txt'
+    text = cmake.read_text()
+    if '# ZONOS_LOCAL_TLS' not in text:
+        text += ('\n# ZONOS_LOCAL_TLS: one engine, native HTTP and HTTPS listeners.\n'
+            'find_package(OpenSSL REQUIRED)\n'
+            'target_compile_definitions(zonos3-server-core PUBLIC CPPHTTPLIB_OPENSSL_SUPPORT)\n'
+            'target_link_libraries(zonos3-server-core PUBLIC OpenSSL::SSL OpenSSL::Crypto)\n')
+        cmake.write_text(text)
     path = SOURCE / 'http.cpp'
     text = path.read_text()
+    anchor = 'void install_middleware(httplib::Server & svr) {'
+    if 'svr.set_payload_max_length(96 * 1024 * 1024);' not in text:
+        if anchor not in text:
+            raise RuntimeError('Runtime changed: middleware patch anchor is missing')
+        text = text.replace(anchor, anchor + '\n    svr.set_payload_max_length(96 * 1024 * 1024);')
     old = 'res.set_content(body, httplib::detail::find_content_type(target.string(), {}, "application/octet-stream"));'
     if old in text:
         text = text.replace(old, 'res.set_content(body, rel_path == "agents.md" ? "text/markdown; charset=utf-8" : httplib::detail::find_content_type(target.string(), {}, "application/octet-stream"));')
-        path.write_text(text)
+    path.write_text(text)
 
 
 if __name__ == '__main__':

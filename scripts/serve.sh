@@ -8,6 +8,17 @@ for file in "$BIN" "$MODEL/zonos3-ptq.gguf" "$MODEL/zac-keep2.gguf" "$MODEL/spk-
   [[ -f "$file" ]] || { echo "Missing: $file. Run python scripts/setup.py" >&2; exit 1; }
 done
 export ZONOS3_VOICES_DIR="${ZONOS3_VOICES_DIR:-$ROOT/voices}"
+# When local certificates exist, enable a second native listener sharing the same engine.
+if [[ -f "$ROOT/certs/server.pem" && -f "$ROOT/certs/server-key.pem" ]]; then
+  export ZONOS3_TLS_CERT="${ZONOS3_TLS_CERT:-$ROOT/certs/server.pem}"
+  export ZONOS3_TLS_KEY="${ZONOS3_TLS_KEY:-$ROOT/certs/server-key.pem}"
+  export ZONOS3_TLS_PORT="${ZONOS3_TLS_PORT:-1920}"
+  [[ "$ZONOS3_TLS_PORT" =~ ^[0-9]{1,5}$ ]] && ((10#$ZONOS3_TLS_PORT > 0 && 10#$ZONOS3_TLS_PORT < 65536)) || {
+    echo 'Invalid ZONOS3_TLS_PORT; use 1..65535.' >&2; exit 1;
+  }
+  export ZONOS3_TLS_PORT="$((10#$ZONOS3_TLS_PORT))"
+  printf '{"https_port":%s,"ca_certificate":"/ca.crt"}\n' "$ZONOS3_TLS_PORT" > "$ROOT/frontend/tls.json"
+fi
 export ZONOS3_FFMPEG="$(command -v ffmpeg)"
 # Explicit decoder prevents automatic loading of a second, larger decoder.
 # One generation slot, one decoder lane; CFG disabled in clients.

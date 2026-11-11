@@ -6,7 +6,7 @@ Sem servidor Python de inferência, sem proxy e sem segunda cópia do modelo. O 
 
 ## Instalar
 
-Requer Linux, GPU NVIDIA com driver funcional, toolkit CUDA (`nvcc`), compiladores C/C++, CMake >= 3.24, Rust/Cargo, Git, FFmpeg e Python >= 3.10.
+Requer Linux, GPU NVIDIA com driver funcional, toolkit CUDA (`nvcc`), compiladores C/C++, CMake >= 3.24, Rust/Cargo, Git, FFmpeg, OpenSSL com headers de desenvolvimento (`libssl-dev` em Debian/Ubuntu) e Python >= 3.10.
 
 Confira a GPU antes de instalar:
 
@@ -30,7 +30,7 @@ O setup:
 3. Aplica a extensão nativa deste projeto para vozes persistentes e documentação Markdown.
 4. Compila em Release/CUDA para a arquitetura da GPU local, gerando `build/cuda/zonos3-server`.
 
-`install-lock.json` fixa as revisões do modelo/runtime usadas por padrão. O arquivo não contém credenciais nem dados de vozes. `--runtime-revision` e `--model-revision` permitem escolher outras revisões, mas mudanças upstream podem exigir adaptar os patches. Não edite `vendor/` diretamente: a extensão mantida pelo projeto fica em `native/saved-voices.inc` e é aplicada por `scripts/patch_runtime.py`.
+`install-lock.json` fixa as revisões do modelo/runtime usadas por padrão. O arquivo não contém credenciais nem dados de vozes. `--runtime-revision` e `--model-revision` permitem escolher outras revisões, mas mudanças upstream podem exigir adaptar os patches. Não edite `vendor/` diretamente: as extensões mantidas pelo projeto ficam em `native/` e é aplicada por `scripts/patch_runtime.py`.
 
 A compilação inicial pode demorar vários minutos. O padrão de quatro jobs limita a RAM durante o build; altere com `--jobs`. Em instalações com CUDA 12.0, o setup prefere GCC 12 quando disponível; `--cuda-host-compiler /caminho/para/g++` permite ajustar essa escolha. Não é preciso instalar PyTorch para servir ou inferir.
 
@@ -74,26 +74,61 @@ Variáveis de ambiente:
 | `ZONOS3_PORT` | `1919` | Porta HTTP. |
 | `ZONOS3_VOICES_DIR` | `<projeto>/voices` | Diretório persistente das vozes do usuário. |
 | `ZONOS3_MAX_TOKENS` | `1000` | Teto de posições de áudio por geração. |
+| `ZONOS3_TLS_PORT` | `1920` | Porta HTTPS, habilitada quando há certificado/chave locais. |
+| `ZONOS3_TLS_CERT` / `ZONOS3_TLS_KEY` | `<projeto>/certs/server.pem` / `server-key.pem` | Certificado/chave do listener nativo TLS; autodetectados quando existem. |
 | `ZONOS3_ACCESS_TOKEN` | ausente | Exige bearer token/cookie em todas as rotas, quando configurado. |
 
 Argumentos extras do launcher são encaminhados ao servidor nativo.
 
 **Acesso de rede:** o padrão permite que clientes com acesso à porta usem a API, inclusive a biblioteca de vozes. `X-TTS-Session-ID` organiza vozes temporárias, mas não é autenticação. Para acesso controlado, use firewall/tailnet e, se necessário, `ZONOS3_ACCESS_TOKEN`. Nesse caso, agentes usam `Authorization: Bearer TOKEN`; no navegador, o runtime aceita o cookie definido por `/?access_token=TOKEN`. Não coloque tokens no Git, em logs ou em links compartilhados. Para tráfego fora de rede confiável, providencie TLS na sua infraestrutura.
 
-## Salvar uma voz pronta pelo frontend
+## Várias referências e gravação pelo microfone
 
-1. Abra a interface.
-2. Escolha inglês ou português.
-3. Selecione uma referência de áudio e preencha **Nome para guardar esta voz**.
-4. Clique em **Salvar voz pronta**.
-5. Espere a mensagem **Voz salva e pronta para usar**. A API só confirma depois de calcular e gravar o embedding.
-6. A voz passa a aparecer em **Minhas vozes prontas**. Escolha-a para gerar sem reenviar áudio ou extrair novamente o locutor.
+1. Abra a interface e escolha o idioma.
+2. Selecione vários áudios de uma vez ou use **Gravar amostra → Parar gravação**, repetindo quantas vezes precisar. Uploads e gravações podem ser misturados.
+3. Ouça as amostras carregadas; remova as que não quiser analisar.
+4. Clique em **Analisar referências**. A API extrai um embedding por arquivo, um por vez.
+5. Revise a **matriz de cosseno entre todos os pares** e as similaridades de cada áudio com a média original e com a média das referências marcadas.
+6. Use os **checkboxes** para escolher quais entram no perfil. A média selecionada é atualizada na hora; nada é salvo nessa etapa.
+7. Dê um nome e clique em **Confirmar seleção e salvar voz**. Só os embeddings escolhidos compõem o perfil persistente.
 
-O nome/ID e o embedding sobrevivem a recarregamentos da página e reinicializações da API. Não é preciso gerar uma frase para concluir o pré-processamento. A mesma voz pode ser usada em ambos os idiomas.
+Os coeficientes medem **consistência entre embeddings**, não qualidade da clonagem nem probabilidade de ser a mesma pessoa. Não há exclusão automática por limiar. A média inclui a própria amostra quando ela está marcada; com uma só referência selecionada, seu cosseno com a média será 1.
 
-Também é possível gerar diretamente com um arquivo de referência sem salvá-lo: nesse caso, o frontend usa uma voz temporária e reaproveita a cache enquanto a página/sessão estiver ativa.
+A média final é aritmética dos vetores brutos float32, sem normalização adicional, com o mesmo coeficiente por gravação, independentemente da duração. Confirmar não reprocessa o áudio; usa a cache da análise. A voz fica em **Minhas vozes prontas**, preservada após recarregar a página ou reiniciar a API. O perfil guarda apenas embedding e metadados dos áudios selecionados, sem gravações originais.
 
-Referências aceitas: WAV, MP3, OGG, FLAC, M4A, AAC, Opus e outros formatos decodificáveis pelo FFmpeg. Prefira **5–15 segundos** de fala limpa, uma pessoa e sem música. Uploads para a biblioteca têm limite de **20 MiB**; o runtime considera até 60 segundos. Os nomes têm limite de 120 bytes UTF-8 e precisam ser únicos. Nomes não são usados como caminhos de arquivo.
+Limites: **1 a 20 referências** por conjunto, **20 MiB por arquivo**, **64 MiB no total**; cada arquivo é considerado por até 60 segundos. Prefira trechos limpos de 5–15 segundos do mesmo locutor. As gravações pelo microfone param automaticamente em 60 segundos por amostra. Os arquivos/Blobs permanecem no navegador até você analisar ou gerar; limpar a lista os libera.
+
+WAV, MP3, OGG, FLAC, M4A, AAC, Opus, WebM e outros formatos decodificáveis pelo FFmpeg são aceitos. Nomes de perfis têm limite de 120 bytes UTF-8 e precisam ser únicos; não são usados como caminhos de arquivo.
+
+Uma referência única ainda pode ser usada diretamente para clonagem temporária, sem criar perfil. Com várias referências na UI, revise e salve o perfil antes de gerar.
+
+### HTTPS autoassinado para usar o microfone remotamente
+
+O navegador exige **localhost ou HTTPS confiável**, além de permissão de microfone. Para o acesso remoto, crie uma CA local autoassinada e o certificado do servidor:
+
+```bash
+# Detecta o IP Tailscale automaticamente, se disponível; ou use --ip IP_DO_HOST.
+python scripts/create_tls_cert.py
+bash scripts/serve.sh
+```
+
+O mesmo processo passa a atender **HTTP em 1919 e HTTPS em 1920**, compartilhando modelo, scheduler e biblioteca. O bind continua `0.0.0.0`; não usa proxy, Tailscale Serve ou Funnel.
+
+No dispositivo cliente:
+
+1. Baixe `http://IP_DO_HOST:1919/ca.crt` pelo link exibido na interface.
+2. Importe o certificado público nas **autoridades confiáveis** do sistema/navegador. No Chrome/Edge, use as configurações de gerenciamento de certificados; no Firefox, a seção de autoridades em certificados.
+3. Abra `https://IP_DO_HOST:1920` e permita o microfone quando solicitado. Apenas ignorar o aviso de certificado pode não liberar a captura.
+
+A chave privada permanece em `certs/`, com permissões restritas, e nunca é servida pelo frontend. Apenas a CA pública é disponibilizada em `/ca.crt`. Confirme a origem/fingerprint com o operador antes de confiar nela. Certificados e configuração HTTPS local não são versionados.
+
+Para adicionar outros IPs/DNS ou renovar o certificado de 365 dias, preservando a CA já confiada:
+
+```bash
+python scripts/create_tls_cert.py --renew --ip IP_DO_HOST --dns-name nome.local
+```
+
+Reinicie a API após emitir/renovar. Para clientes HTTP automatizados, `curl --cacert certs/ca.pem https://IP_DO_HOST:1920/v2/health` verifica a cadeia corretamente. O [guia para agentes](frontend/agents.md) mostra como configurar urllib e o CLI. Veja também as restrições de [getUserMedia](https://developer.mozilla.org/en-US/docs/Web/API/MediaDevices/getUserMedia).
 
 ## API e guia para agentes
 
@@ -107,7 +142,11 @@ Principais rotas:
 | `GET /v2/capabilities` | Capacidades carregadas. |
 | `GET /v2/speakers` | Vozes oficiais, vozes salvas e vozes temporárias da sessão. |
 | `GET /v2/voices` | Biblioteca persistente do usuário. |
-| `POST /v2/voices` | Upload + pré-processamento + gravação da voz nomeada. |
+| `POST /v2/voice-analyses` | Analisar vários arquivos sem criar perfil. |
+| `GET /v2/voice-analyses/{id}` | Recuperar matriz e médias da análise original. |
+| `POST /v2/voice-analyses/{id}/selection` | Comparar com a média de um subconjunto, sem reprocessar. |
+| `DELETE /v2/voice-analyses/{id}` | Descartar a análise temporária. |
+| `POST /v2/voices` | Cadastro direto ou confirmação de um perfil usando `analysis_id`, `selected_sample_ids` e `confirmed:true`. |
 | `GET /v2/voices/{id}` | Metadados e confirmação `ready`. |
 | `PATCH /v2/voices/{id}` | Renomear/alterar idioma sugerido sem recalcular o embedding. |
 | `DELETE /v2/voices/{id}` | Excluir da biblioteca. |
@@ -117,7 +156,21 @@ Principais rotas:
 | `POST /v1/audio/speech` | Geração compatível com OpenAI. |
 | `GET /agents.md` | Guia completo para uso autônomo. |
 
-Salvar por upload multipart:
+Análise de várias referências:
+
+```bash
+BASE='http://127.0.0.1:1919'
+curl --fail-with-body --max-time 180 "$BASE/v2/voice-analyses" \
+  -F 'audio=@take-1.wav' -F 'audio=@take-2.mp3' -o analysis.json
+# Use o analysis_id retornado e os sample IDs que o usuário confirmou:
+curl --fail-with-body "$BASE/v2/voices" -H 'Content-Type: application/json' \
+  -d '{"name":"Perfil revisado","language":"pt_br","analysis_id":"analysis_ID_REAL","selected_sample_ids":["sample_1","sample_2"],"confirmed":true}'
+```
+
+A análise expira em 30 minutos, sem guardar áudio/PCM; após reinício/expiração, precisa ser refeita. O perfil confirmado é persistente e independe dessa cache. Até 32 análises podem aguardar confirmação, e apenas um lote é pré-processado por vez. O corpo HTTP tem teto global de 96 MiB. A API retorna 429 se outro lote está processando ou a cache está cheia.
+
+Cadastro direto de um arquivo, mantido por compatibilidade com clientes anteriores:
+
 
 ```bash
 BASE='http://127.0.0.1:1919'
@@ -182,6 +235,9 @@ Testes locais de cliente, PCM/WAV e erros:
 ```bash
 python -m unittest discover -s tests -v
 node tests/audio.test.mjs
+node tests/reference-math.test.mjs
+c++ -std=c++17 -O2 tests/reference_math.cpp -o /tmp/zonos-reference-math-test
+/tmp/zonos-reference-math-test
 bash -n scripts/serve.sh
 python -m compileall -q infer.py scripts tests
 ```
@@ -191,6 +247,8 @@ Os testes reais de biblioteca são opt-in e precisam da API/modelo em execução
 ```bash
 ZONOS_LIVE_URL=http://127.0.0.1:1919 python -m unittest discover -s tests -v
 python scripts/validate.py --reference models/gguf/voices/English/Jett_en-energetic_M_1.wav
+# Inclua as verificações TLS quando o certificado e o listener HTTPS estiverem ativos:
+ZONOS_LIVE_URL=http://127.0.0.1:1919 ZONOS_HTTPS_URL=https://HOST:1920 python -m unittest discover -s tests -v
 ```
 
 O teste de validação gera EN/PT, WAV buffered, streaming e clonagem com WAV/MP3/OGG, salva os resultados em `outputs/validation/` e mede latência/RTF. `--server-pid PID` adiciona amostras de RAM RSS; a medição de VRAM é do dispositivo inteiro e inclui outros processos, podendo perder picos muito breves.
@@ -202,15 +260,20 @@ Testes reais de interface no Chromium:
 .venv/bin/python -m playwright install chromium
 .venv/bin/python scripts/browser_smoke.py --reference outputs/validation/reference.mp3
 .venv/bin/python scripts/named_voice_smoke.py --reference outputs/validation/reference.mp3
+.venv/bin/python scripts/multi_reference_smoke.py
+# Instância temporária isolada: precisa de VRAM extra durante o teste, sem mexer na biblioteca real.
+.venv/bin/python scripts/persistence_smoke.py
+# Requer um Chromium local com suporte a dispositivo de áudio de teste:
+.venv/bin/python scripts/microphone_smoke.py --url https://HOST:1920
 ```
 
-Os scripts do navegador também aceitam `--url`. Verificam geração nos dois idiomas, upload/cache, cadastro de voz nomeada, reutilização após recarregar a página, ausência de novo upload nas gerações, WAV baixável e layout desktop/mobile. Cada voz criada pelos testes de biblioteca/interface é excluída ao final; use uma instância de teste se não quiser compartilhar recursos com usuários ativos.
+Os scripts do navegador também aceitam `--url`. Verificam geração nos dois idiomas, upload/cache, cadastro de voz nomeada, reutilização após recarregar a página, ausência de novo upload nas gerações, seleção de 5 entre 10 referências, matriz cruzada, gravações repetidas por MediaRecorder, mistura de gravações com arquivos, WAV baixável e layout desktop/mobile. O teste de microfone usa um dispositivo simulado alimentado por fala real, não o microfone físico do usuário. Cada voz criada pelos testes de biblioteca/interface é excluída ao final; use uma instância de teste se não quiser compartilhar recursos com usuários ativos.
 
 A persistência também foi validada com reinício real do processo: a voz foi restaurada, gerou sem sessão e sem carregar novamente o speaker encoder. Testes de fluxo e sinal não substituem avaliação humana de pronúncia, timbre ou semelhança.
 
 ## Dados locais e Git
 
-Não são versionados: pesos, runtime baixado, builds, biblioteca `voices/`, áudio de referência, áudio gerado, embeddings, relatórios, capturas, logs, PIDs, `.env`, chaves ou configurações de agentes/cloud.
+Não são versionados: certificados/chaves e configuração HTTPS local, pesos, runtime baixado, builds, biblioteca `voices/`, áudio de referência, áudio gerado, embeddings, relatórios, capturas, logs, PIDs, `.env`, chaves ou configurações de agentes/cloud.
 
 As vozes persistentes ficam em `voices/` (ou `ZONOS3_VOICES_DIR`). Para backup/restauração, copie esse diretório com a API parada e mantenha encoder/modelo compatível. Ele contém dados de voz e deve ser tratado como dado sensível. Apagar `voices/` remove a biblioteca. Atualizar o código não deve apagar esse diretório.
 

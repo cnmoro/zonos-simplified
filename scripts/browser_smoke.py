@@ -25,14 +25,16 @@ def main():
         page.on('pageerror', lambda error: errors.append(str(error)))
         page.goto(args.url, wait_until='networkidle')
         page.wait_for_function("document.getElementById('health').textContent === 'Modelo conectado'")
+        reference_uploaded = False
         for language, text, clone in [('pt_br', 'Olá! Tudo bem?', False),
                                        ('en_us', 'Hello! How are you?', False),
                                        ('pt_br', 'Esta é a voz de referência.', True),
                                        ('en_us', 'Reusing the same voice.', True)]:
             page.select_option('#language', language)
             page.fill('#text', text)
-            if clone and not page.locator('#reference').input_value():
+            if clone and not reference_uploaded:
                 page.set_input_files('#reference', args.reference)
+                reference_uploaded = True
             page.click('#generate')
             page.wait_for_function("document.getElementById('status').textContent === 'Concluído'", timeout=240000)
             assert page.locator('#result').is_visible()

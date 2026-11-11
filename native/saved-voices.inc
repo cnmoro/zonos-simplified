@@ -122,6 +122,8 @@ static void saved_unique_name(const SavedVoiceStore & store, const std::string &
             fail(409, "A saved voice with this name already exists", json{{"voice_id", pair.first}});
 }
 
+#include "reference-analysis.inc"
+
 static void saved_create(ServerState & s, const httplib::Request & request, httplib::Response & response) {
     constexpr size_t max_audio = 20 * 1024 * 1024;
     if (request.body.size() > 28 * 1024 * 1024) fail(413, "Request exceeds 28 MiB");
@@ -140,20 +142,29 @@ static void saved_create(ServerState & s, const httplib::Request & request, http
         audio.assign(part.content.begin(), part.content.end());
     } else {
         body = saved_json_body(request);
-        saved_validate_fields(body, {"name", "language", "speaker_audio_base64", "speaker_audio_name", "speaker_embedding_id"});
+        saved_validate_fields(body, {"name", "language", "speaker_audio_base64", "speaker_audio_name", "speaker_embedding_id", "analysis_id", "selected_sample_ids", "confirmed"});
         const bool has_audio = body.contains("speaker_audio_base64");
         const bool has_id = body.contains("speaker_embedding_id");
-        if (has_audio == has_id) fail(422, "Provide exactly one of speaker_audio_base64 or speaker_embedding_id");
+        const bool has_analysis = body.contains("analysis_id");
+        if ((int) has_audio + (int) has_id + (int) has_analysis != 1)
+            fail(422, "Provide exactly one of speaker_audio_base64, speaker_embedding_id or analysis_id");
+        if (has_analysis) {
+            if (!body["analysis_id"].is_string()) fail(422, "analysis_id must be a string");
+            if (!body.contains("confirmed") || !body["confirmed"].is_boolean() || !body["confirmed"].get<bool>())
+                fail(422, "Explicit confirmation is required: confirmed must be true");
+        } else if (body.contains("selected_sample_ids") || body.contains("confirmed")) {
+            fail(422, "selected_sample_ids and confirmed require analysis_id");
+        }
         if (has_audio) {
             if (!body["speaker_audio_base64"].is_string()) fail(422, "speaker_audio_base64 must be a string");
             audio = decode_b64_field(body, "speaker_audio_base64");
-        } else if (!body["speaker_embedding_id"].is_string() || body["speaker_embedding_id"].get<std::string>().empty()) {
+        } else if (has_id && (!body["speaker_embedding_id"].is_string() || body["speaker_embedding_id"].get<std::string>().empty())) {
             fail(422, "speaker_embedding_id must be a nonempty string");
         }
     }
     const auto name = saved_name(body), language = saved_language(body);
     if (audio.size() > max_audio) fail(413, "Audio exceeds 20 MiB");
-    if (!body.contains("speaker_embedding_id") && audio.empty()) fail(400, "Audio is empty");
+    if (!body.contains("speaker_embedding_id") && !body.contains("analysis_id") && audio.empty()) fail(400, "Audio is empty");
     auto & store = saved_voice_store();
     {
         std::lock_guard<std::mutex> lock(store.mutex);
@@ -162,7 +173,14 @@ static void saved_create(ServerState & s, const httplib::Request & request, http
     const auto started = std::chrono::steady_clock::now();
     std::vector<float> embedding;
     double reference_duration = 0;
-    if (body.contains("speaker_embedding_id")) {
+    std::optional<ReferenceAnalysis> analysis;
+    std::vector<size_t> selected;
+    if (body.contains("analysis_id")) {
+        analysis = find_reference_analysis(body["analysis_id"].get<std::string>());
+        selected = reference_selection(*analysis, body);
+        embedding = reference_mean(*analysis, selected);
+        for (size_t index : selected) reference_duration += analysis->samples[index].seconds;
+    } else if (body.contains("speaker_embedding_id")) {
         embedding = voice_embedding(s, session_id(request), body["speaker_embedding_id"].get<std::string>());
     } else {
         auto pcm = decode_audio_bytes(audio);
@@ -173,6 +191,18 @@ static void saved_create(ServerState & s, const httplib::Request & request, http
         {"language", language}, {"model", "ZONOS3-Mini/ownmect_s2"}, {"created_at", unix_now()},
         {"embedding", embedding}, {"reference_seconds", reference_duration},
         {"preprocessing_ms", std::chrono::duration<double, std::milli>(std::chrono::steady_clock::now() - started).count()}};
+    if (analysis) {
+        json selected_ids = json::array(), sources = json::array();
+        for (size_t index : selected) {
+            const auto & sample = analysis->samples[index];
+            selected_ids.push_back(sample.id);
+            sources.push_back({{"id", sample.id}, {"name", sample.name}, {"reference_seconds", sample.seconds},
+                {"similarity_to_profile", zonos_reference::cosine(sample.embedding, embedding)}});
+        }
+        voice["sample_count"] = selected.size();
+        voice["preprocessing_ms"] = analysis->preprocessing_ms;
+        voice["reference_analysis"] = {{"aggregation", "arithmetic_mean"}, {"selected_sample_ids", selected_ids}, {"samples", sources}};
+    }
     {
         std::lock_guard<std::mutex> lock(store.mutex);
         saved_unique_name(store, name);
@@ -185,6 +215,7 @@ static void saved_create(ServerState & s, const httplib::Request & request, http
 static void register_saved_voice_routes(httplib::Server & server, ServerState & s) {
     // Fail startup if the configured persistent directory cannot be initialized.
     saved_voice_store();
+    register_reference_analysis_routes(server, s);
     server.Get("/v2/voices", guarded([](const httplib::Request &, httplib::Response & response) {
         send_json(response, json{{"voices", list_saved_voices()}});
     }));

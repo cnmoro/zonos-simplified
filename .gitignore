@@ -46,3 +46,10 @@ credentials.json
 *.pth
 *.pt
 *.safetensors
+
+# Machine-specific HTTPS certificates and generated public download/config
+/certs/
+/frontend/ca.crt
+/frontend/tls.json
+*.srl
+*.csr

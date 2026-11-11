@@ -7,9 +7,21 @@
 <form id="form">
 <div class="row"><label>Idioma<select id="language"><option value="pt_br">Português · Brasil</option><option value="en_us">English · US</option></select></label><label>Voz<select id="voice"><option value="">Padrão do modelo</option></select></label></div>
 <label>Texto<textarea id="text" rows="6" maxlength="3000" required>Olá! Esta é uma demonstração de geração de voz em português.</textarea></label>
-<label class="upload">Clonar uma voz <span>Opcional · referência limpa de 5 a 15 segundos · até 20 MB</span><input id="reference" type="file" accept="audio/*,.wav,.mp3,.ogg,.flac,.m4a,.aac,.opus,.aiff,.wma"></label>
-<div class="save-row"><label>Nome para guardar esta voz<input id="voice-name" type="text" maxlength="120" placeholder="Ex.: Narradora principal" autocomplete="off"></label><button id="save-voice" type="button" disabled>Salvar voz pronta</button></div>
-<p id="reference-info" class="hint">Envie uma referência e dê um nome para guardá-la já processada.</p>
+<label class="upload">Clonar uma voz <span>Opcional · 1 a 20 áudios · 20 MiB por arquivo · 64 MiB no total</span><input id="reference" type="file" multiple accept="audio/*,.wav,.mp3,.ogg,.flac,.m4a,.aac,.opus,.aiff,.wma"></label>
+<div class="microphone-controls"><strong>Ou grave pelo microfone</strong><div class="actions"><button id="record-start" type="button">Gravar amostra</button><button id="record-stop" type="button" disabled>Parar gravação</button></div><p id="microphone-status" role="status" aria-live="polite">Grave quantas amostras precisar, até o limite de 20 referências no conjunto.</p></div>
+<details id="microphone-help" hidden><summary>Como habilitar o microfone neste acesso</summary><p>O navegador exige HTTPS confiável ou localhost. Para acesso remoto, <a href="/ca.crt" download="zonos-local-ca.crt">baixe o certificado público da CA local</a>, importe-o nas autoridades confiáveis do dispositivo e <a id="microphone-https" href="#">abra a versão HTTPS</a>. Apenas ignorar o alerta do certificado pode não liberar o microfone.</p><p id="microphone-origin"></p></details>
+<details id="reference-files" hidden open><summary id="reference-file-summary">Referências carregadas</summary><div id="reference-file-rows"></div><button id="clear-references" type="button">Limpar referências</button></details>
+<div class="analysis-actions"><button id="analyze-references" type="button" disabled>Analisar referências</button><span id="analysis-status" role="status" aria-live="polite"></span></div>
+<section id="reference-analysis" hidden aria-label="Comparação das referências">
+<h2>Consistência das referências</h2>
+<p class="hint">Similaridade de cosseno de −1 a 1. Não é nota de qualidade nem probabilidade de ser a mesma pessoa. A média inclui os áudios marcados, inclusive o próprio áudio quando marcado.</p>
+<p id="selection-count" role="status"></p>
+<div class="table-scroll" tabindex="0" role="region" aria-label="Referências e seleção"><table class="reference-table"><thead><tr><th scope="col">Usar</th><th scope="col">Arquivo</th><th scope="col">Ouvir</th><th scope="col">Duração usada</th><th scope="col">Média original</th><th scope="col">Média selecionada</th></tr></thead><tbody id="reference-rows"></tbody></table></div>
+<h3>Similaridade entre os áudios</h3>
+<div class="table-scroll" tabindex="0" role="region" aria-label="Matriz de similaridade"><table id="similarity-matrix"></table></div>
+</section>
+<div class="save-row"><label>Nome para guardar esta voz<input id="voice-name" type="text" maxlength="120" placeholder="Ex.: Narradora principal" autocomplete="off"></label><button id="save-voice" type="button" disabled>Confirmar seleção e salvar voz</button></div>
+<p id="reference-info" class="hint">Analise as referências, escolha quais entram no perfil e confirme para salvar. Um único arquivo também pode ser usado diretamente para geração temporária.</p>
 <div class="actions"><button id="generate" type="submit">Gerar voz</button><button id="cancel" type="button" hidden>Parar</button><span id="status" role="status" aria-live="polite"></span></div>
 </form>
 <section id="result" hidden aria-label="Áudio gerado"><h2>Pronto para ouvir</h2><audio id="audio" controls></audio><div class="row"><p id="metrics"></p><a id="download" download="zonos.wav">Baixar WAV</a></div></section>

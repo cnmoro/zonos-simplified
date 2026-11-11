@@ -36,6 +36,89 @@ Para selecionar uma voz oficial, filtre `speaker_modes` contendo `embedding`. `l
 
 ## 3. Salvar uma voz nomeada, pronta para reutilização
 
+### 3.0 Vários áudios: analisar, revisar a seleção e confirmar
+
+Para um perfil formado por várias gravações, use este fluxo em duas etapas. Analisar **não cria** a voz. Não envie `confirmed:true` sem que o usuário tenha escolhido quais referências usar e autorizado a criação do perfil.
+
+**Etapa A: `POST /v2/voice-analyses`** aceita multipart com o campo `audio` repetido:
+
+```bash
+curl --fail-with-body --max-time 180 "$BASE/v2/voice-analyses" \
+  -F 'audio=@take-1.wav' \
+  -F 'audio=@take-2.mp3' \
+  -F 'audio=@take-3.ogg' -o analysis.json
+```
+
+Também aceita JSON, com uma lista ordenada `samples`:
+
+```json
+{
+  "samples": [
+    {"name":"take-1.wav","speaker_audio_base64":"BASE64_REAL_1"},
+    {"name":"take-2.ogg","speaker_audio_base64":"BASE64_REAL_2"}
+  ]
+}
+```
+
+Limites: **1 a 20 amostras**, **20 MiB por arquivo**, **64 MiB somados** e **96 MiB por requisição HTTP**. Cada áudio é considerado por até 60 segundos, independentemente dos outros. Processamento sequencial na GPU evita multiplicar workspaces. Apenas um lote é pré-processado por vez; outro lote concorrente recebe 429. Nenhuma média é salva automaticamente.
+
+HTTP 201 retorna:
+
+```json
+{
+  "id":"analysis_0123456789abcdef01234567",
+  "analysis_id":"analysis_0123456789abcdef01234567",
+  "created_at":1790000000.0,
+  "expires_at":1790001800.0,
+  "persistent":false,
+  "sample_count":2,
+  "preprocessing_ms":2500.0,
+  "metric":"cosine",
+  "aggregation":"arithmetic_mean",
+  "selected_sample_ids":["sample_1","sample_2"],
+  "samples":[
+    {"id":"sample_1","name":"take-1.wav","reference_seconds":8.0,"preprocessing_ms":1200.0,"embedding_norm":10.0,"similarity_to_mean":0.97},
+    {"id":"sample_2","name":"take-2.ogg","reference_seconds":7.0,"preprocessing_ms":1300.0,"embedding_norm":10.0,"similarity_to_mean":0.97}
+  ],
+  "pairwise_similarity":[[1.0,0.88],[0.88,1.0]],
+  "interpretation":"Embedding consistency, not a quality score or identity probability"
+}
+```
+
+Números e IDs são ilustrativos. `pairwise_similarity[i][j]` corresponde às posições `i` e `j` em `samples`. Os nomes podem se repetir; selecione pelos **IDs**, não pelo nome do arquivo. Os IDs `sample_1`, etc. só fazem sentido dentro de sua análise.
+
+A matriz contém **similaridade de cosseno** entre os embeddings, no intervalo −1..1. Na resposta inicial, `similarity_to_mean` usa a média de todas as amostras. Os embeddings não são expostos nessa resposta; `embedding_norm` e a matriz permitem recalcular o cosseno de uma seleção no cliente.
+
+**Não interprete os coeficientes como notas de qualidade, porcentagem de semelhança ou probabilidade de identidade.** Não há limiar automático de aprovação/reprovação. Uma amostra contribui para a média quando selecionada; com só uma amostra selecionada, sua similaridade com a própria média será 1 por construção. A escuta das referências continua relevante.
+
+A agregação é a **média aritmética dos embeddings brutos float32**, um coeficiente `1/N` por gravação selecionada, sem normalização adicional ou peso por duração. Essa escolha segue o comportamento de agregação do runtime nativo. Gravações de durações diferentes têm o mesmo coeficiente; magnitudes dos vetores não são forçadas a serem iguais.
+
+Para consultar a análise original: `GET /v2/voice-analyses/{analysis_id}`. Para recalcular a comparação com a média de um subconjunto, sem reenviar áudio ou criar um perfil:
+
+```bash
+curl --fail-with-body "$BASE/v2/voice-analyses/analysis_ID_REAL/selection" \
+  -H 'Content-Type: application/json' \
+  -d '{"selected_sample_ids":["sample_1","sample_3"]}'
+```
+
+A lista precisa conter pelo menos um ID válido, sem duplicatas. A resposta tem o mesmo formato da análise, mas `similarity_to_mean` é recalculado para **todos** os áudios em relação à média escolhida. A matriz entre pares continua igual. Essa consulta não altera a análise original nem cria uma voz. A seleção de exemplo só é válida se houver pelo menos três amostras na análise real.
+
+**Etapa B: confirmação e cadastro.** Depois que o usuário escolher as referências e confirmar, faça:
+
+```bash
+curl --fail-with-body "$BASE/v2/voices" \
+  -H 'Content-Type: application/json' \
+  -d '{"name":"Perfil revisado","language":"pt_br","analysis_id":"analysis_ID_REAL","selected_sample_ids":["sample_1","sample_3"],"confirmed":true}'
+```
+
+Retorna HTTP 201 com a voz persistente já pronta. A confirmação usa os embeddings em cache e **não extrai os áudios novamente**. A voz contém `sample_count` e `reference_analysis` com os IDs/nomes das referências escolhidas e o cosseno de cada uma com o perfil final. Referências desmarcadas não contribuem para a média e seus metadados não são gravados no perfil.
+
+As análises expiram **30 minutos depois de terminar o processamento**, com no máximo 32 análises pendentes; a remoção da cache expirada ocorre no próximo acesso/novo lote ou ao encerrar o processo. Guardam apenas embeddings e metadados, não áudio/PCM. Reiniciar a API remove análises ainda não confirmadas; vozes já salvas permanecem em disco. Se receber 404/410, reenvie os arquivos e peça ao usuário para revisar a nova análise. `DELETE /v2/voice-analyses/{id}` descarta a análise; isso não apaga uma voz que já foi criada a partir dela. O frontend descarta sua análise após salvar ou mudar os arquivos.
+
+Na UI, o usuário também pode gravar várias referências pelo microfone, ouvir/remover amostras e misturar gravações com uploads. O navegador produz WebM/Opus, OGG/Opus ou M4A conforme suporte; a API os recebe como qualquer outro arquivo. A gravação só é enviada ao servidor quando o usuário manda analisar, ou quando gera diretamente com uma única referência temporária.
+
+Microfone exige contexto seguro e permissão do usuário. Use localhost ou o listener HTTPS, com o certificado local confiado no dispositivo. Um agente HTTP não pode acessar o microfone do usuário sem um cliente/browser autorizado. Não há endpoint que grave secretamente o microfone do servidor.
+
 ### 3.1 Upload multipart, recomendado
 
 `POST /v2/voices`, `Content-Type: multipart/form-data`.
@@ -110,7 +193,7 @@ Nomes precisam ser únicos na biblioteca: espaços nas pontas são removidos e l
 
 ### 3.4 Promover uma voz temporária ou oficial para a biblioteca
 
-Em vez de reenviar áudio, envie exatamente uma fonte: `speaker_embedding_id` **ou** `speaker_audio_base64`.
+Para esse fluxo de promoção, envie `speaker_embedding_id` em vez de `speaker_audio_base64`. Na criação por análise, use apenas `analysis_id` como fonte; nunca combine fontes diferentes.
 
 ```bash
 curl --fail-with-body --max-time 180 "$BASE/v2/voices" \
@@ -302,6 +385,8 @@ O campo opcional `condition_values` aceita `loudness` em LUFS, `fmax` em Hz e `s
 | 400 | áudio inválido, voz inexistente em geração, ausência de sessão, combinação inválida, modo não disponível | Leia `detail`, corrija campos ou redescubra IDs; não repita cegamente. |
 | 403 | token exigido e ausente/incorreto | Use credencial fornecida pelo operador. Não tente adivinhar token. |
 | 404 | rota ou voz salva não encontrada; preview ausente | Atualize a listagem, confira URL e ID. |
+| 410 | análise expirada | Reenvie as amostras, refaça a análise e revise a seleção. |
+| 429 | outro lote em processamento ou cache de análises cheia | Aguarde ou descarte análises que não serão usadas; não repita em loop rápido. |
 | 409 | nome de voz já usado | Leia `voice_id`, reutilize se apropriado ou escolha outro nome. |
 | 413 | referência acima de 20 MiB / corpo acima de 28 MiB na biblioteca | Corte ou recomprima o arquivo. |
 | 422 | JSON inválido, tipo/campo/idioma incorreto | Corrija payload conforme este documento. |
@@ -315,7 +400,7 @@ Erros usam `{"detail":"mensagem"}`; validação nativa também pode devolver `de
 1. Determine a origem da API a partir da URL deste documento e verifique `/v2/health`.
 2. Determine idioma e texto do pedido; use `pt_br` ou `en_us` explicitamente.
 3. Se foi pedido usar uma voz já salva, liste `/v2/voices`, encontre por nome e use seu ID; em caso de ambiguidade, não escolha um locutor arbitrário.
-4. Se há arquivo e o usuário quer reutilização, crie a voz nomeada em `/v2/voices` e espere `ready:true`. Guarde nome e ID. Se só quer uma clonagem pontual, use sessão temporária.
+4. Se há vários arquivos, analise em `/v2/voice-analyses`, apresente matriz e similaridades com a média, obtenha a seleção e confirmação do usuário e então cadastre com `analysis_id`. Com um arquivo, também pode usar esse fluxo de revisão. Para cadastro direto já autorizado, crie a voz nomeada em `/v2/voices` e espere `ready:true`. Guarde nome e ID. Se só quer uma clonagem pontual, use sessão temporária.
 5. Sem referência nem voz escolhida, selecione uma voz oficial adequada em `/v2/speakers`.
 6. Monte uma requisição de geração por frase/parágrafo, com uma única fonte de voz, modo embedding e decoder keep2_plain.
 7. Para entregar um arquivo, use WAV buffered; para tocar com baixa latência, leia PCM progressivamente e converta corretamente.
@@ -327,3 +412,21 @@ Erros usam `{"detail":"mensagem"}`; validação nativa também pode devolver `de
 Não há ASR/transcrição, edição de fala, alinhamento, referência bruta (`speaker_mode:reference`), guidance com múltiplos slots, decoder `full_mr`, criação por direção/steering nem controle de emoção instalado. Não tente usar esses endpoints/controles supondo suporte. Se uma instalação mudar, consulte `/v2/capabilities` e a documentação local atualizada.
 
 Vozes salvas ficam no diretório `voices/` do host (ou `ZONOS3_VOICES_DIR`). Esse diretório contém embeddings sensíveis: não é versionado. Backup/restauração exige copiar esse diretório com acesso ao host e manter o mesmo encoder/modelo compatível; a API não publica os arquivos internos nem o áudio original. Os endpoints HTTP de geração não armazenam automaticamente as saídas no disco do servidor; o cliente deve salvá-las.
+
+## 12. HTTPS local e confiança no certificado
+
+O listener HTTP padrão usa porta 1919. Quando o operador gera o certificado local, existe também **HTTPS na porta 1920** por padrão, com os mesmos endpoints, biblioteca e processo/modelo em GPU. Não há proxy, Serve ou Funnel. `/tls.json`, quando existe, informa `https_port` e o caminho do certificado público.
+
+A CA local é autoassinada. O certificado público pode ser obtido em `/ca.crt`; o cliente precisa confiar nessa CA, ou informar seu arquivo explicitamente. Confira sua origem com o operador antes de importar. Nunca peça a chave privada da CA ou do servidor. Para curl:
+
+```bash
+# Obtenha o certificado público pela origem HTTP conhecida do host.
+BASE_HTTP='http://HOST:1919' # substitua pelo host real
+curl --fail "$BASE_HTTP/ca.crt" -o zonos-local-ca.crt
+BASE_HTTPS='https://HOST:1920' # substitua pelo host real
+curl --cacert zonos-local-ca.crt --fail "$BASE_HTTPS/v2/health"
+```
+
+Em Python, use `ssl.create_default_context(cafile="zonos-local-ca.crt")` e passe `context=` ao `urllib.request.urlopen`. Para o CLI, `SSL_CERT_FILE=/caminho/zonos-local-ca.crt python infer.py --url https://HOST:1920 ...` usa a CA sem desativar verificação. Evite `verify=False`/`--insecure` nos fluxos normais; eles só ignoram a verificação e não instalam confiança no navegador para liberar microfone.
+
+No navegador, importe o certificado público em autoridades confiáveis do dispositivo/navegador e abra a origem HTTPS. Depois permita acesso ao microfone. O certificado cobre os IPs/DNS informados na sua criação; usar outro IP/nome pode produzir erro de hostname. Consulte o README do projeto para gerar/renovar o certificado.

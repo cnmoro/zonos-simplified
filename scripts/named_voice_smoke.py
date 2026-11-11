@@ -33,6 +33,8 @@ def main():
             page.goto(args.url, wait_until='networkidle')
             page.wait_for_function("document.getElementById('health').textContent === 'Modelo conectado'")
             page.set_input_files('#reference', args.reference)
+            page.click('#analyze-references')
+            page.wait_for_function("document.getElementById('reference-analysis').hidden === false && !document.getElementById('analyze-references').disabled", timeout=180000)
             page.fill('#voice-name', name)
             page.click('#save-voice')
             page.wait_for_function("document.getElementById('status').textContent === 'Voz salva e pronta para usar'", timeout=180000)
