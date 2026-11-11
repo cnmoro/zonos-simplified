@@ -1,0 +1,2 @@
+# Optional: browser end-to-end verification; not required by the API/runtime.
+playwright>=1.50,<2

@@ -1,0 +1,15 @@
+Zonos Simplified uses the official Zyphra/ZONOS3-Mini inference runtime,
+which is downloaded during installation and distributed under the MIT License:
+https://github.com/Zyphra/ZONOS3-Mini
+Copyright (c) 2026 Zyphra, Inc.
+
+The native extension and reproducible patch script in this repository modify
+that runtime. Upstream notices and submodule licenses are preserved in the
+local vendor checkout; vendor code is not included in this repository.
+
+The ZONOS3-Mini model weights are distributed separately by Zyphra under
+Apache-2.0 according to their model card:
+https://huggingface.co/Zyphra/ZONOS3-Mini
+
+FFmpeg, the CUDA toolkit/driver, ggml, zyphra-textnorm and other dependencies
+retain their respective licenses. They are not relicensed by this project.

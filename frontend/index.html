@@ -1,0 +1,17 @@
+<!doctype html>
+<html lang="pt-BR">
+<head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1"><title>Zonos · Voz</title><link rel="stylesheet" href="/style.css"></head>
+<body><main>
+<header><span class="brand">Zonos / Voz</span><span id="health" role="status">Conectando…</span></header>
+<h1>Seu texto, em voz.</h1><p class="intro">Gere em inglês ou português. Use uma voz pronta ou envie uma referência.</p>
+<form id="form">
+<div class="row"><label>Idioma<select id="language"><option value="pt_br">Português · Brasil</option><option value="en_us">English · US</option></select></label><label>Voz<select id="voice"><option value="">Padrão do modelo</option></select></label></div>
+<label>Texto<textarea id="text" rows="6" maxlength="3000" required>Olá! Esta é uma demonstração de geração de voz em português.</textarea></label>
+<label class="upload">Clonar uma voz <span>Opcional · referência limpa de 5 a 15 segundos · até 20 MB</span><input id="reference" type="file" accept="audio/*,.wav,.mp3,.ogg,.flac,.m4a,.aac,.opus,.aiff,.wma"></label>
+<div class="save-row"><label>Nome para guardar esta voz<input id="voice-name" type="text" maxlength="120" placeholder="Ex.: Narradora principal" autocomplete="off"></label><button id="save-voice" type="button" disabled>Salvar voz pronta</button></div>
+<p id="reference-info" class="hint">Envie uma referência e dê um nome para guardá-la já processada.</p>
+<div class="actions"><button id="generate" type="submit">Gerar voz</button><button id="cancel" type="button" hidden>Parar</button><span id="status" role="status" aria-live="polite"></span></div>
+</form>
+<section id="result" hidden aria-label="Áudio gerado"><h2>Pronto para ouvir</h2><audio id="audio" controls></audio><div class="row"><p id="metrics"></p><a id="download" download="zonos.wav">Baixar WAV</a></div></section>
+<footer>Áudio gerado localmente · <a href="/agents.md">Guia da API para agentes</a></footer>
+</main><script type="module" src="/app.js"></script></body></html>
