@@ -11,7 +11,7 @@ Este documento é servido por `GET /agents.md`. Use HTTP para operar a API; não
 - Não invente IDs de vozes. Liste-os antes de usar. O ID, não o nome, deve ser passado na geração.
 - Um slot de geração e um decoder estão configurados. Faça gerações sequenciais para obter latência previsível. Requisições concorrentes podem esperar na fila.
 - Use timeout de conexão de 10 segundos e timeout total de pelo menos 180 segundos para pré-processamento/geração. Observe o status HTTP e o corpo dos erros antes de salvar uma saída como áudio.
-- `max_tokens: 1000` é o teto configurado: são posições autoregressivas de áudio, incluindo o atraso dos codebooks, e não tokens de texto. Com 15 frames/s, permite aproximadamente um minuto. Divida textos longos em parágrafos/frases e gere sequencialmente; atingir o teto pode truncar a fala. O frontend/CLI limitam o texto a 3000 caracteres, mas o limite real útil depende da duração falada.
+- `max_tokens: 1000` é o teto configurado: são posições autoregressivas de áudio, incluindo o atraso dos codebooks, e não tokens de texto. Com 15 frames/s, permite aproximadamente um minuto. A UI divide automaticamente textos longos em trechos de até cerca de 350 caracteres e gera sequencialmente com a mesma voz, concatenando PCM em um WAV. Clientes diretos da API devem dividir o texto da mesma forma; atingir o teto pode truncar a fala. O frontend/CLI limitam o texto a 3000 caracteres, mas o limite real útil depende da duração falada.
 - Para baixa latência/custo, use `speaker_cfg_scale: 1.0`. Guidance acima disso exige mais slots e não é suportada pelo launcher atual.
 - Os áudios são mono a 44100 Hz. `wav` é PCM16 completo. **`pcm` é float32 little-endian, não PCM16**, sem cabeçalho.
 - Nesta implantação, não há autenticação configurada por padrão. Clientes com acesso de rede à API podem listar, criar, renomear, apagar e usar vozes salvas. Não trate `X-TTS-Session-ID` como autenticação. Se o operador configurar `ZONOS3_ACCESS_TOKEN`, envie `Authorization: Bearer TOKEN` em todas as chamadas, inclusive ao documento; não registre esse token em arquivos, logs ou URLs.
@@ -453,7 +453,7 @@ curl --cacert zonos-local-ca.crt --fail-with-body "$BASE/v2/audio-assets" \
 
 O exemplo assume `BASE` como origem HTTPS e uma CA pública já obtida do operador. Se a CA já estiver confiada no sistema, `--cacert` pode ser omitido.
 
-Alternativa JSON: `{"audio_name":"speech.wav","audio_base64":"BASE64_REAL_DOS_BYTES"}`. Limites: um arquivo de até **20 MiB**, **120 segundos** e corpo de até 28 MiB. Outros formatos decodificáveis pelo FFmpeg também podem ser registrados e são normalizados; um WAV PCM16 mono/44100 válido é preservado byte a byte em 1.0x.
+Alternativa JSON: `{"audio_name":"speech.wav","audio_base64":"BASE64_REAL_DOS_BYTES"}`. Limites: um arquivo de até **20 MiB**, **220 segundos** e corpo de até 28 MiB. Outros formatos decodificáveis pelo FFmpeg também podem ser registrados e são normalizados; um WAV PCM16 mono/44100 válido é preservado byte a byte em 1.0x.
 
 HTTP 201 retorna:
 

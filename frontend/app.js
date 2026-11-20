@@ -1,4 +1,5 @@
 import {PCMReader, wavBlob} from './audio.mjs';
+import {splitText} from './text.mjs';
 import {initializeDownloads, clearDownloadAudio, setDownloadAudio} from './downloads.js';
 import {initializeReferences, addReferenceFiles, clearReferenceFiles, getReferenceFiles, referenceFileCount, setReferenceListDisabled, selectionPayload, analyzedReferenceCount, referencesBusy, hasReferenceAnalysis} from './references.js';
 import {initializeMicrophone, setMicrophoneAvailable} from './recordings.js';
@@ -155,7 +156,7 @@ $('form').onsubmit = async event => {
   $('audio').pause(); $('audio').removeAttribute('src');
   if (objectURL) { URL.revokeObjectURL(objectURL); objectURL = null; }
   $('status').textContent = 'Preparando…';
-  const chunks = [], readerPCM = new PCMReader();
+  const chunks = [];
   let samples = 0, first = null, nextTime = 0, start;
   try {
     if (context && context.state !== 'closed') await context.close();
@@ -176,25 +177,31 @@ $('form').onsubmit = async event => {
       voice = cachedVoice;
     }
     start = performance.now();
-    const payload = {text:$('text').value.trim(), language:$('language').value, stream:true, format:'pcm',
+    const segments = splitText($('text').value);
+    for (const [index, text] of segments.entries()) {
+    const readerPCM = new PCMReader();
+    let segmentSamples = 0;
+    const payload = {text, language:$('language').value, stream:true, format:'pcm',
       speaker_mode:'embedding', speaker_cfg_scale:1, decoder:'keep2_plain', max_tokens:1000};
     if (voice) payload.speaker_embedding_id = voice;
     const response = await checked(await fetch('/v2/generate', {method:'POST', headers, signal, body:JSON.stringify(payload)}));
     const stream = response.body.getReader();
-    $('status').textContent = 'Gerando…';
+    $('status').textContent = `Gerando trecho ${index + 1}/${segments.length}…`;
     while (true) {
       const {value, done} = await stream.read(); if (done) break;
       const part = readerPCM.push(value); if (!part.length) continue;
       if (first === null) first = performance.now() - start;
-      samples += part.length;
-      if (samples > 44100 * 75) throw new Error('Limite de áudio excedido. Divida o texto.');
+      samples += part.length; segmentSamples += part.length;
+      if (samples > 44100 * 220) throw new Error('Áudio excedeu 220 segundos. Gere o texto em partes menores.');
       chunks.push(part);
       const buffer = context.createBuffer(1, part.length, 44100); buffer.copyToChannel(part, 0);
       const source = context.createBufferSource(); source.buffer = buffer; source.connect(context.destination);
       nextTime = Math.max(nextTime, context.currentTime + 0.06); source.start(nextTime); nextTime += buffer.duration;
-      $('status').textContent = 'Reproduzindo enquanto gera…';
+      $('status').textContent = `Reproduzindo trecho ${index + 1}/${segments.length}…`;
     }
-    if (readerPCM.pending.length || !samples) throw new Error('Áudio incompleto ou vazio.');
+    if (readerPCM.pending.length || !segmentSamples) throw new Error('Áudio incompleto ou vazio.');
+    if (segmentSamples / 44100 >= 63) throw new Error(`O trecho ${index + 1} atingiu o limite de geração. Reduza o texto desse trecho e tente novamente.`);
+    }
     const blob = wavBlob(chunks);
     objectURL = URL.createObjectURL(blob); $('audio').src = objectURL;
     const elapsed = (performance.now() - start) / 1000, duration = samples / 44100;

@@ -150,12 +150,12 @@ static void create_download_asset(const httplib::Request & request,httplib::Resp
     bool canonical=false; DownloadWaveInfo info;
     try { info=download_wave_info(input); canonical=true; } catch (const std::exception &) {}
     if (canonical) {
-        if (info.seconds()>120) fail(413,"Audio must be at most 120 seconds");
+        if (info.seconds()>220) fail(413,"Audio must be at most 220 seconds");
         fs::rename(input,original);
     } else {
-        auto pcm=audio_decode_file(input.c_str(),44100,121);
+        auto pcm=audio_decode_file(input.c_str(),44100,221);
         if (pcm.empty()) fail(400,"Audio cannot be decoded");
-        if (pcm.size()>120ull*44100) fail(413,"Audio must be at most 120 seconds");
+        if (pcm.size()>220ull*44100) fail(413,"Audio must be at most 220 seconds");
         if (!wav_pcm16_write(original.c_str(),pcm,44100)) fail(500,"Cannot normalize audio");
         info=download_wave_info(original); fs::remove(input);
     }

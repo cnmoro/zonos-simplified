@@ -231,7 +231,7 @@ curl --cacert certs/ca.pem --fail "$BASE/v2/audio-assets/audio_ID_REAL/download?
 
 Sem `?speeds=`, `/durations` retorna todas as 16 velocidades. A resposta inclui a duração exata de cada WAV e sua URL de download. `GET /v2/audio-assets/{id}` consulta o original; `DELETE /v2/audio-assets/{id}` descarta o asset. O endpoint de download também informa `X-Audio-Duration-Seconds` e `X-Audio-Speed` nos headers.
 
-Até 20 MiB e 120 segundos por áudio; uploads JSON/base64 são aceitos além de multipart. O cache é temporário: uma hora, até 32 assets e 512 MiB por instância, em `outputs/audio-cache/` por padrão (`ZONOS3_AUDIO_CACHE_DIR` altera o diretório). IDs são invalidados após reiniciar a API. A UI limpa o cache do áudio anterior ao gerar outro ou fechar/recarregar a página; salve os downloads que quiser manter. Arquivos e variantes não são versionados. Isso não altera a biblioteca persistente de vozes.
+Até 20 MiB e 220 segundos por áudio; uploads JSON/base64 são aceitos além de multipart. O cache é temporário: uma hora, até 32 assets e 512 MiB por instância, em `outputs/audio-cache/` por padrão (`ZONOS3_AUDIO_CACHE_DIR` altera o diretório). IDs são invalidados após reiniciar a API. A UI limpa o cache do áudio anterior ao gerar outro ou fechar/recarregar a página; salve os downloads que quiser manter. Arquivos e variantes não são versionados. Isso não altera a biblioteca persistente de vozes.
 
 Consulte o [guia completo](frontend/agents.md#13-baixar-o-mesmo-áudio-em-velocidades-diferentes-e-consultar-durações) para payloads, respostas, limites e erros. [Documentação do filtro atempo](https://ffmpeg.org/ffmpeg-filters.html#atempo).
 
@@ -325,3 +325,5 @@ Código deste projeto e runtime oficial: MIT; veja [LICENSE](LICENSE) e [NOTICE]
 - [Runtime oficial ZONOS3-Mini](https://github.com/Zyphra/ZONOS3-Mini)
 - [Backend ggml/CUDA](https://github.com/Zyphra/ZONOS3-Mini/tree/main/servers/ggml)
 - [Contrato HTTP upstream](https://github.com/Zyphra/ZONOS3-Mini/blob/main/docs/api.md)
+
+A interface divide textos longos automaticamente em trechos de aproximadamente 350 caracteres, gera sequencialmente com a mesma voz e reúne o PCM em um único WAV. Cada chamada direta a `/v2/generate` continua limitada por `max_tokens`; clientes da API devem dividir o texto. O resultado da UI tem limite de 220 segundos.
