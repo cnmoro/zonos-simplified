@@ -19,6 +19,8 @@ function rememberSelection() {
   updateReferenceControls();
 }
 let cachedFile = null, cachedVoice = null, controller, context, objectURL;
+let resultSeed = null;
+$('reuse-seed').onclick = () => { if (resultSeed !== null) $('seed').value = resultSeed; };
 let speakers = [], working = false, microphoneActive = false;
 function chooseDefaultVoice() {
   if (speakers.some(speaker => speaker.id === $('voice').value && speaker.persistent)) return;
@@ -149,6 +151,7 @@ $('form').onsubmit = async event => {
   working = true; updateReferenceControls();
   controller = new AbortController();
   const signal = controller.signal;
+  $('seed').disabled = true; $('reuse-seed').disabled = true;
   $('generate').disabled = true; $('cancel').hidden = false; $('result').hidden = true;
   for (const id of ['language', 'voice', 'text', 'reference', 'voice-name', 'save-voice', 'analyze-references']) $(id).disabled = true;
   clearDownloadAudio();
@@ -179,7 +182,14 @@ $('form').onsubmit = async event => {
     const payload = {text:$('text').value.trim(), language:$('language').value, stream:true, format:'pcm',
       speaker_mode:'embedding', speaker_cfg_scale:1, decoder:'keep2_plain', max_tokens:3300};
     if (voice) payload.speaker_embedding_id = voice;
+    if ($('seed').value.trim()) {
+      const seed = Number($('seed').value);
+      if (!Number.isInteger(seed) || seed < 0 || seed > 4294967295) throw new Error('Seed deve ser um inteiro de 0 a 4294967295.');
+      payload.seed = seed;
+    }
     const response = await checked(await fetch('/v2/generate', {method:'POST', headers, signal, body:JSON.stringify(payload)}));
+    const seedHeader = response.headers.get('X-Seed');
+    resultSeed = seedHeader !== null && /^\d+$/.test(seedHeader) ? Number(seedHeader) : null;
     const stream = response.body.getReader();
     $('status').textContent = 'Gerando…';
     while (true) {
@@ -201,6 +211,8 @@ $('form').onsubmit = async event => {
     const elapsed = (performance.now() - start) / 1000, duration = samples / 44100;
     setDownloadAudio(blob,objectURL,duration);
     $('metrics').textContent = `${duration.toFixed(1)} s de áudio · Primeiro áudio: ${Math.round(first)} ms · RTF: ${(elapsed / duration).toFixed(2)}`;
+    if (resultSeed !== null) $('metrics').textContent += ` · Seed: ${resultSeed}`;
+    $('reuse-seed').disabled = resultSeed === null;
     $('result').hidden = false; $('status').textContent = 'Concluído';
     // Let queued playback finish, then release audio resources.
     const finishedContext = context;
@@ -210,6 +222,7 @@ $('form').onsubmit = async event => {
     if (context && context.state !== 'closed') await context.close();
     $('status').textContent = error.name === 'AbortError' ? 'Interrompido' : error.message;
   } finally {
+    $('seed').disabled = false;
     $('generate').disabled = false; $('cancel').hidden = true;
     for (const id of ['language', 'text', 'reference', 'voice-name']) $(id).disabled = false;
     working = false;

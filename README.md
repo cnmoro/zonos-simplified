@@ -327,3 +327,5 @@ Código deste projeto e runtime oficial: MIT; veja [LICENSE](LICENSE) e [NOTICE]
 - [Contrato HTTP upstream](https://github.com/Zyphra/ZONOS3-Mini/blob/main/docs/api.md)
 
 A interface gera o texto inteiro em uma única sequência contínua, preservando o contexto de fala. O teto padrão é de 3300 posições de áudio (aproximadamente 218 segundos), com um único slot GPU. Resultados próximos do teto são sinalizados como potencialmente incompletos.
+
+A interface permite informar uma seed e exibe a seed retornada em `X-Seed`. Vazio usa uma nova seed aleatória a cada geração; o botão “Reutilizar esta interpretação” preenche o valor do último resultado. Reutilize com texto, voz e configurações iguais para comparar interpretações. Isso não garante pronúncia correta ou igualdade entre versões/hardwares; uma transcrição correta também não comprova naturalidade.
