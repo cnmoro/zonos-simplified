@@ -74,7 +74,7 @@ Variáveis de ambiente:
 | `ZONOS3_PORT` | `1919` | Porta HTTP. |
 | `ZONOS3_AUDIO_CACHE_DIR` | `<projeto>/outputs/audio-cache` | Cache temporário de WAVs e variantes de velocidade, sem afetar perfis de voz. |
 | `ZONOS3_VOICES_DIR` | `<projeto>/voices` | Diretório persistente das vozes do usuário. |
-| `ZONOS3_MAX_TOKENS` | `1000` | Teto de posições de áudio por geração. |
+| `ZONOS3_MAX_TOKENS` | `3300` | Teto de posições de áudio por geração. |
 | `ZONOS3_HTTP_DISABLED` | `1` quando há certificados | Desliga completamente o listener HTTP; `0` habilita ambos. |
 | `ZONOS3_TLS_PORT` | `1920` | Porta HTTPS, habilitada quando há certificado/chave locais. |
 | `ZONOS3_TLS_CERT` / `ZONOS3_TLS_KEY` | `<projeto>/certs/server.pem` / `server-key.pem` | Certificado/chave do listener nativo TLS; autodetectados quando existem. |
@@ -205,7 +205,7 @@ Geração com voz salva:
 # Troque voice_ID_REAL pelo id retornado acima.
 curl --fail-with-body --max-time 180 "$BASE/v2/generate" \
   -H 'Content-Type: application/json' \
-  -d '{"text":"Olá! Esta voz já estava pronta.","language":"pt_br","speaker_embedding_id":"voice_ID_REAL","speaker_mode":"embedding","decoder":"keep2_plain","stream":false,"format":"wav","max_tokens":1000}' \
+  -d '{"text":"Olá! Esta voz já estava pronta.","language":"pt_br","speaker_embedding_id":"voice_ID_REAL","speaker_mode":"embedding","decoder":"keep2_plain","stream":false,"format":"wav","max_tokens":3300}' \
   -o outputs/voz.wav
 ```
 
@@ -265,7 +265,7 @@ Configuração escolhida para reduzir consumo:
 
 Em uma RTX 2060 SUPER de 8 GB, os testes de geração curta aquecida com vozes prontas observaram primeiro áudio em cerca de **30 ms**, RTF próximo de **0,07–0,09**, aproximadamente **1,3 GiB de VRAM** antes de usar o speaker encoder e **1,6–1,7 GiB** após clonagem; RAM RSS em torno de **0,5 GiB**. Pré-processar uma nova referência levou cerca de **1,5–2,2 s**. São medições de exemplos curtos, não garantias para outros textos, versões, GPUs ou concorrências.
 
-Mil posições de áudio correspondem aproximadamente a um minuto, já descontados os atrasos dos codebooks. Divida textos longos; atingir o teto pode cortar a fala. A API nativa aceita opções além das expostas na interface: consulte o guia local e o schema upstream. Não suponha que endpoints opcionais estejam disponíveis.
+O teto padrão de 3300 posições permite aproximadamente 218 segundos, descontados os atrasos dos codebooks. Atingir o teto pode cortar a fala. A API nativa aceita opções além das expostas na interface: consulte o guia local e o schema upstream. Não suponha que endpoints opcionais estejam disponíveis.
 
 ## Testes e validação
 
@@ -326,4 +326,4 @@ Código deste projeto e runtime oficial: MIT; veja [LICENSE](LICENSE) e [NOTICE]
 - [Backend ggml/CUDA](https://github.com/Zyphra/ZONOS3-Mini/tree/main/servers/ggml)
 - [Contrato HTTP upstream](https://github.com/Zyphra/ZONOS3-Mini/blob/main/docs/api.md)
 
-A interface divide textos longos automaticamente em trechos de aproximadamente 350 caracteres, gera sequencialmente com a mesma voz e reúne o PCM em um único WAV. Cada chamada direta a `/v2/generate` continua limitada por `max_tokens`; clientes da API devem dividir o texto. O resultado da UI tem limite de 220 segundos.
+A interface gera o texto inteiro em uma única sequência contínua, preservando o contexto de fala. O teto padrão é de 3300 posições de áudio (aproximadamente 218 segundos), com um único slot GPU. Resultados próximos do teto são sinalizados como potencialmente incompletos.

@@ -39,7 +39,7 @@ def cache_voice(base_url, reference, session):
 
 
 def synthesize(base_url, text, language, output, *, voice=None, reference=None,
-               session=None, max_tokens=1000, seed=42, stream=True):
+               session=None, max_tokens=3300, seed=42, stream=True):
     if language not in LANGUAGES:
         raise ValueError('Supported languages: en, pt, en_us, pt_br')
     if not text.strip() or len(text) > 3000:
@@ -112,7 +112,7 @@ def main():
     parser.add_argument('--output', type=Path, default=Path('outputs/speech.wav'))
     parser.add_argument('--url', default='http://127.0.0.1:1919')
     parser.add_argument('--seed', type=int, default=42)
-    parser.add_argument('--max-tokens', type=int, default=1000)
+    parser.add_argument('--max-tokens', type=int, default=3300)
     parser.add_argument('--buffered', action='store_true')
     args = parser.parse_args()
     result = synthesize(args.url, args.text, args.language, args.output, voice=args.voice,

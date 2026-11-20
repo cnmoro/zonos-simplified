@@ -26,6 +26,6 @@ export ZONOS3_FFMPEG="$(command -v ffmpeg)"
 # One generation slot, one decoder lane; CFG disabled in clients.
 exec "$BIN" "$MODEL/zonos3-ptq.gguf" --gpu --zac-gpu \
   --zac "$MODEL/zac-keep2.gguf" --spk-encoder "$MODEL/spk-encoder.gguf" \
-  --batch 1 --zac-threads 1 --max "${ZONOS3_MAX_TOKENS:-1000}" \
+  --batch 1 --zac-threads 1 --max "${ZONOS3_MAX_TOKENS:-3300}" \
   --tts-default-voices-dir "$MODEL/voices" --studio-dir "$ROOT/frontend" \
   --host "${ZONOS3_HOST:-0.0.0.0}" --port "${ZONOS3_PORT:-1919}" "$@"

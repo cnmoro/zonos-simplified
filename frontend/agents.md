@@ -11,7 +11,7 @@ Este documento é servido por `GET /agents.md`. Use HTTP para operar a API; não
 - Não invente IDs de vozes. Liste-os antes de usar. O ID, não o nome, deve ser passado na geração.
 - Um slot de geração e um decoder estão configurados. Faça gerações sequenciais para obter latência previsível. Requisições concorrentes podem esperar na fila.
 - Use timeout de conexão de 10 segundos e timeout total de pelo menos 180 segundos para pré-processamento/geração. Observe o status HTTP e o corpo dos erros antes de salvar uma saída como áudio.
-- `max_tokens: 1000` é o teto configurado: são posições autoregressivas de áudio, incluindo o atraso dos codebooks, e não tokens de texto. Com 15 frames/s, permite aproximadamente um minuto. A UI divide automaticamente textos longos em trechos de até cerca de 350 caracteres e gera sequencialmente com a mesma voz, concatenando PCM em um WAV. Clientes diretos da API devem dividir o texto da mesma forma; atingir o teto pode truncar a fala. O frontend/CLI limitam o texto a 3000 caracteres, mas o limite real útil depende da duração falada.
+- `max_tokens: 3300` é o teto padrão: posições autoregressivas de áudio, incluindo o atraso dos codebooks, e não tokens de texto. Com 15 frames/s, permite aproximadamente 218 segundos de fala. A UI envia o texto inteiro em uma única geração contínua para preservar ritmo, volume e contexto. Não concatena gerações independentes. O frontend/CLI limitam o texto a 3000 caracteres; a duração útil depende do ritmo de fala. Atingir o teto pode truncar o áudio; a UI sinaliza resultados próximos do teto como potencialmente incompletos.
 - Para baixa latência/custo, use `speaker_cfg_scale: 1.0`. Guidance acima disso exige mais slots e não é suportada pelo launcher atual.
 - Os áudios são mono a 44100 Hz. `wav` é PCM16 completo. **`pcm` é float32 little-endian, não PCM16**, sem cabeçalho.
 - Nesta implantação, não há autenticação configurada por padrão. Clientes com acesso de rede à API podem listar, criar, renomear, apagar e usar vozes salvas. Não trate `X-TTS-Session-ID` como autenticação. Se o operador configurar `ZONOS3_ACCESS_TOKEN`, envie `Authorization: Bearer TOKEN` em todas as chamadas, inclusive ao documento; não registre esse token em arquivos, logs ou URLs.
@@ -226,7 +226,7 @@ print(json.dumps({
     "speaker_cfg_scale": 1.0,
     "stream": False,
     "format": "wav",
-    "max_tokens": 1000,
+    "max_tokens": 3300,
     "seed": 42,
 }, ensure_ascii=False))
 PY
@@ -247,7 +247,7 @@ Campos de geração usados nesta instalação:
 | `decoder` | `keep2_plain` | Único decoder carregado. |
 | `stream` | boolean | `false` com WAV; `true` com PCM. |
 | `format` | `wav` ou `pcm` | WAV completo ou float32 LE bruto. |
-| `max_tokens` | inteiro, recomendado 1000 | Teto de posições de áudio configurado no servidor. |
+| `max_tokens` | inteiro, recomendado 3300 | Teto de posições de áudio configurado no servidor. |
 | `seed` | inteiro 0..4294967295 ou null | Seed retornada em `X-Seed`; repetições com a mesma entrada/configuração podem ser reproduzíveis, sem promessa de igualdade entre versões/hardwares. |
 | `speaker_cfg_scale` | 1.0 | Mantém guidance desligada e usa um slot. |
 | `text_normalization` | true | Normalização de números, datas etc. |
@@ -345,7 +345,7 @@ body = {
     "speaker_mode": "embedding",
     "decoder": "keep2_plain",
     "response_format": "wav",
-    "max_tokens": 1000,
+    "max_tokens": 3300,
 }
 req = urllib.request.Request(BASE + "/v1/audio/speech", json.dumps(body).encode(),
     headers={"Content-Type": "application/json"})
@@ -371,7 +371,7 @@ A API nativa permite combinar duas vozes por interpolação esférica dos embedd
   "decoder": "keep2_plain",
   "stream": false,
   "format": "wav",
-  "max_tokens": 1000
+  "max_tokens": 3300
 }
 ```
 
